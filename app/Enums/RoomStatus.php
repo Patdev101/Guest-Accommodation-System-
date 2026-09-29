@@ -50,4 +50,41 @@ enum RoomStatus: string
     {
         return in_array($to, $this->allowedTransitions(), true);
     }
+
+    /**
+     * Changes staff can make from the room page. Occupied, Check-out and
+     * Inspection are only reached through check-in and check-out.
+     *
+     * @return list<self>
+     */
+    public function manualTransitions(): array
+    {
+        return array_values(array_filter(
+            $this->allowedTransitions(),
+            fn (self $status) => ! in_array($status, [self::Occupied, self::CheckOut, self::Inspection], true),
+        ));
+    }
+
+    public function group(): RoomStatusGroup
+    {
+        return match ($this) {
+            self::Available => RoomStatusGroup::Available,
+            self::Occupied, self::CheckOut => RoomStatusGroup::InUse,
+            self::Inspection, self::Cleaning => RoomStatusGroup::Turnover,
+            self::UnderMaintenance, self::OutOfService => RoomStatusGroup::Unavailable,
+        };
+    }
+
+    public function description(): string
+    {
+        return match ($this) {
+            self::Available => 'Ready for a guest.',
+            self::Occupied => 'A guest is in the room.',
+            self::CheckOut => 'The guest is checking out.',
+            self::Inspection => 'Staff are checking the room for damages.',
+            self::Cleaning => 'The room is being cleaned.',
+            self::UnderMaintenance => 'Something needs repair. Guests cannot use the room.',
+            self::OutOfService => 'Taken out of use for a longer period.',
+        };
+    }
 }

@@ -2,21 +2,21 @@ import { Form, Head, router, usePage } from '@inertiajs/react';
 import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import UserController from '@/actions/App/Http/Controllers/Admin/UserController';
-import Heading from '@/components/heading';
-import InputError from '@/components/input-error';
+import { FormField } from '@/components/form-field';
+import { Page, PageHeader } from '@/components/page';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
     Dialog,
     DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
+    DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -24,6 +24,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { index } from '@/routes/admin/users';
 import type { Role } from '@/types';
 
@@ -43,7 +52,6 @@ type Props = {
 export default function Users({ users, roles }: Props) {
     const { auth } = usePage().props;
     const [open, setOpen] = useState(false);
-    const [newRole, setNewRole] = useState<Role>('reception');
 
     const changeRole = (user: Account, role: string) =>
         router.patch(
@@ -55,172 +63,46 @@ export default function Users({ users, roles }: Props) {
     return (
         <>
             <Head title="Users" />
-            <div className="flex flex-col gap-6 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading
-                        title="Users"
-                        description="Guests register themselves. Reception and Admin accounts are created here."
-                    />
+            <Page>
+                <PageHeader
+                    title="Users"
+                    description="Guests register themselves. Reception and Admin accounts are created here."
+                    actions={
+                        <Button onClick={() => setOpen(true)}>
+                            <UserPlus />
+                            New account
+                        </Button>
+                    }
+                />
 
-                    <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <UserPlus />
-                                New account
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogTitle>New account</DialogTitle>
-                            <DialogDescription>
-                                Share the password with the person directly.
-                                They can change it under Settings.
-                            </DialogDescription>
-
-                            <Form
-                                {...UserController.store.form()}
-                                resetOnSuccess
-                                onSuccess={() => setOpen(false)}
-                                className="space-y-4"
-                            >
-                                {({ processing, errors }) => (
-                                    <>
-                                        <input
-                                            type="hidden"
-                                            name="role"
-                                            value={newRole}
-                                        />
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="role">Role</Label>
-                                            <Select
-                                                value={newRole}
-                                                onValueChange={(value) =>
-                                                    setNewRole(value as Role)
-                                                }
-                                            >
-                                                <SelectTrigger
-                                                    id="role"
-                                                    className="w-full"
-                                                >
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {roles.map((role) => (
-                                                        <SelectItem
-                                                            key={role.value}
-                                                            value={role.value}
-                                                        >
-                                                            {role.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <InputError message={errors.role} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">Name</Label>
-                                            <Input
-                                                id="name"
-                                                name="name"
-                                                required
-                                            />
-                                            <InputError message={errors.name} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="email">Email</Label>
-                                            <Input
-                                                id="email"
-                                                name="email"
-                                                type="email"
-                                                required
-                                            />
-                                            <InputError
-                                                message={errors.email}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="contact_number">
-                                                Contact number
-                                            </Label>
-                                            <Input
-                                                id="contact_number"
-                                                name="contact_number"
-                                                type="tel"
-                                            />
-                                            <InputError
-                                                message={errors.contact_number}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="password">
-                                                Password
-                                            </Label>
-                                            <PasswordInput
-                                                id="password"
-                                                name="password"
-                                                autoComplete="new-password"
-                                                required
-                                            />
-                                            <InputError
-                                                message={errors.password}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="password_confirmation">
-                                                Confirm password
-                                            </Label>
-                                            <PasswordInput
-                                                id="password_confirmation"
-                                                name="password_confirmation"
-                                                autoComplete="new-password"
-                                                required
-                                            />
-                                        </div>
-                                        <DialogFooter className="gap-2">
-                                            <DialogClose asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="secondary"
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            </DialogClose>
-                                            <Button
-                                                type="submit"
-                                                disabled={processing}
-                                            >
-                                                Create account
-                                            </Button>
-                                        </DialogFooter>
-                                    </>
-                                )}
-                            </Form>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-
-                <div className="overflow-x-auto rounded-xl border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/50 text-left text-muted-foreground">
-                            <tr>
-                                <th className="px-4 py-2 font-medium">Name</th>
-                                <th className="px-4 py-2 font-medium">Email</th>
-                                <th className="px-4 py-2 font-medium">
+                <Card className="gap-0 overflow-hidden py-0">
+                    <Table>
+                        <TableHeader className="bg-muted/50">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="pl-4">Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead className="hidden md:table-cell">
                                     Contact number
-                                </th>
-                                <th className="px-4 py-2 font-medium">Role</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
+                                </TableHead>
+                                <TableHead className="pr-4">Role</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {users.map((user) => (
-                                <tr key={user.id}>
-                                    <td className="px-4 py-2 font-medium">
+                                <TableRow key={user.id}>
+                                    <TableCell className="pl-4 font-medium">
                                         {user.name}
-                                    </td>
-                                    <td className="px-4 py-2">{user.email}</td>
-                                    <td className="px-4 py-2">
+                                        {user.id === auth.user.id && (
+                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                (you)
+                                            </span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell className="hidden text-muted-foreground md:table-cell">
                                         {user.contact_number ?? '—'}
-                                    </td>
-                                    <td className="px-4 py-2">
+                                    </TableCell>
+                                    <TableCell className="pr-4">
                                         <Select
                                             value={user.role}
                                             onValueChange={(role) =>
@@ -246,13 +128,131 @@ export default function Users({ users, roles }: Props) {
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                        </TableBody>
+                    </Table>
+                </Card>
+            </Page>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New account</DialogTitle>
+                        <DialogDescription>
+                            Share the password with the person directly. They
+                            can change it under Settings.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <Form
+                        {...UserController.store.form()}
+                        resetOnSuccess
+                        onSuccess={() => setOpen(false)}
+                        className="space-y-4"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <FormField
+                                    label="Role"
+                                    htmlFor="role"
+                                    error={errors.role}
+                                >
+                                    <Select
+                                        name="role"
+                                        defaultValue="reception"
+                                    >
+                                        <SelectTrigger
+                                            id="role"
+                                            className="w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {roles.map((role) => (
+                                                <SelectItem
+                                                    key={role.value}
+                                                    value={role.value}
+                                                >
+                                                    {role.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </FormField>
+                                <FormField
+                                    label="Name"
+                                    htmlFor="name"
+                                    error={errors.name}
+                                >
+                                    <Input id="name" name="name" required />
+                                </FormField>
+                                <FormField
+                                    label="Email"
+                                    htmlFor="email"
+                                    error={errors.email}
+                                >
+                                    <Input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        required
+                                    />
+                                </FormField>
+                                <FormField
+                                    label="Contact number"
+                                    htmlFor="contact_number"
+                                    optional
+                                    error={errors.contact_number}
+                                >
+                                    <Input
+                                        id="contact_number"
+                                        name="contact_number"
+                                        type="tel"
+                                    />
+                                </FormField>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <FormField
+                                        label="Password"
+                                        htmlFor="password"
+                                        error={errors.password}
+                                    >
+                                        <PasswordInput
+                                            id="password"
+                                            name="password"
+                                            autoComplete="new-password"
+                                            required
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Confirm password"
+                                        htmlFor="password_confirmation"
+                                    >
+                                        <PasswordInput
+                                            id="password_confirmation"
+                                            name="password_confirmation"
+                                            autoComplete="new-password"
+                                            required
+                                        />
+                                    </FormField>
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline">
+                                            Cancel
+                                        </Button>
+                                    </DialogClose>
+                                    <Button type="submit" disabled={processing}>
+                                        {processing && <Spinner />}
+                                        Create account
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        )}
+                    </Form>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

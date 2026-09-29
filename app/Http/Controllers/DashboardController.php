@@ -6,10 +6,14 @@ use App\Enums\IdCustodyStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\Role;
 use App\Enums\RoomStatus;
+use App\Enums\RoomStatusGroup;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Models\IdCustody;
 use App\Models\Location;
+use App\Models\MaintenanceRecord;
 use App\Models\Reservation;
 use App\Models\Room;
+use App\Models\Setting;
 use App\Models\Stay;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -22,24 +26,77 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        return Inertia::render('dashboard', match ($user->role) {
-            Role::Admin => $this->forAdmin(),
-            Role::Reception => $this->forReception(),
-            Role::Guest => $this->forGuest($user),
-        });
+        return match ($user->role) {
+            Role::Admin => Inertia::render('admin/dashboard', $this->forAdmin()),
+            Role::Reception => Inertia::render('dashboard', $this->forReception()),
+            Role::Guest => Inertia::render('dashboard', $this->forGuest($user)),
+        };
     }
 
     /** @return array<string, mixed> */
     private function forAdmin(): array
     {
+        $rooms = Room::query()
+            ->with(['location:id,name', 'rates:id,room_id,is_extension_rate'])
+            ->get()
+            ->sortBy(fn (Room $room) => $room->location->name."\0".$room->name, SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $groupCounts = RoomStatusGroup::tally($rooms->map(fn (Room $room) => $room->status));
+        $withoutRates = $rooms->filter(fn (Room $room) => ! $room->rates->contains('is_extension_rate', false));
+
         return [
             'stats' => [
+                'rooms' => $rooms->count(),
+                'capacity' => (int) $rooms->sum('pax_capacity'),
                 'locations' => Location::count(),
-                'rooms' => Room::count(),
-                'reception' => User::where('role', Role::Reception)->count(),
-                'guests' => User::where('role', Role::Guest)->count(),
             ],
-            'roomStatuses' => $this->roomStatusCounts(),
+            'groups' => array_map(fn (array $group) => [
+                ...$group,
+                'count' => $groupCounts[$group['value']],
+            ], RoomStatusGroup::options()),
+            'breakdown' => array_map(fn (RoomStatus $status) => [
+                'value' => $status->value,
+                'label' => $status->label(),
+                'group' => $status->group()->value,
+                'count' => $rooms->filter(fn (Room $room) => $room->status === $status)->count(),
+            ], RoomStatus::cases()),
+            'board' => Location::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Location $location) => [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'rooms' => $rooms
+                        ->where('location_id', $location->id)
+                        ->values()
+                        ->map(fn (Room $room) => $room->summary()),
+                ]),
+            'checklist' => [
+                'locations' => Location::count(),
+                'rooms' => $rooms->count(),
+                'roomsWithoutRates' => $withoutRates->take(5)->values()->map(fn (Room $room) => $room->summary()),
+                'roomsWithoutRatesCount' => $withoutRates->count(),
+                'roomsWithoutExtensionRate' => $rooms
+                    ->filter(fn (Room $room) => ! $room->rates->contains('is_extension_rate', true))
+                    ->count(),
+                'settingsReviewed' => Setting::query()->whereKey(SettingsController::REVIEWED_KEY)->exists(),
+            ],
+            'recentMaintenance' => MaintenanceRecord::query()
+                ->with('room.location')
+                ->orderByDesc('performed_on')
+                ->orderByDesc('id')
+                ->limit(5)
+                ->get()
+                ->map(fn (MaintenanceRecord $record) => [
+                    'id' => $record->id,
+                    'room_id' => $record->room_id,
+                    'room' => $record->room->name,
+                    'location' => $record->room->location->name,
+                    'performed_on' => $record->performed_on->toDateString(),
+                    'issue' => $record->issue,
+                    'resolved' => $record->action_taken !== null,
+                ]),
         ];
     }
 
@@ -83,7 +140,7 @@ class DashboardController extends Controller
         return ['reservations' => $reservations];
     }
 
-    /** @return list<array{status: string, label: string, count: int}> */
+    /** @return list<array{status: string, label: string, group: string, count: int}> */
     private function roomStatusCounts(): array
     {
         $counts = Room::query()
@@ -94,6 +151,7 @@ class DashboardController extends Controller
         return array_map(fn (RoomStatus $status) => [
             'status' => $status->value,
             'label' => $status->label(),
+            'group' => $status->group()->value,
             'count' => (int) ($counts[$status->value] ?? 0),
         ], RoomStatus::cases());
     }

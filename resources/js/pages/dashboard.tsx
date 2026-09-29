@@ -1,4 +1,6 @@
 import { Head, usePage } from '@inertiajs/react';
+import { StatTile } from '@/components/admin/stat-tile';
+import { RoomStatusBadge } from '@/components/room-status-badge';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -7,11 +9,16 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { roomStatusColor } from '@/lib/room-status';
-import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import type { RoomStatusGroup } from '@/types';
 
-type RoomStatusCount = { status: string; label: string; count: number };
+// Reception and guest dashboards are placeholders until their phases.
+type RoomStatusCount = {
+    status: string;
+    label: string;
+    group: RoomStatusGroup;
+    count: number;
+};
 
 type GuestReservation = {
     id: number;
@@ -30,10 +37,6 @@ type Props = {
 };
 
 const statLabels: Record<string, string> = {
-    locations: 'Locations',
-    rooms: 'Rooms',
-    reception: 'Reception accounts',
-    guests: 'Guest accounts',
     arrivalsToday: 'Arrivals today',
     inHouse: 'Guests in house',
     checkoutsToday: 'Check-outs today',
@@ -76,16 +79,11 @@ export default function Dashboard({
                 {stats && (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         {Object.entries(stats).map(([key, value]) => (
-                            <Card key={key} className="gap-2 py-4">
-                                <CardHeader className="px-4">
-                                    <CardDescription>
-                                        {statLabels[key] ?? key}
-                                    </CardDescription>
-                                    <CardTitle className="text-3xl tabular-nums">
-                                        {value}
-                                    </CardTitle>
-                                </CardHeader>
-                            </Card>
+                            <StatTile
+                                key={key}
+                                label={statLabels[key] ?? key}
+                                value={value}
+                            />
                         ))}
                     </div>
                 )}
@@ -102,18 +100,12 @@ export default function Dashboard({
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
                             {roomStatuses.map((item) => (
-                                <span
+                                <RoomStatusBadge
                                     key={item.status}
-                                    className={cn(
-                                        'inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium',
-                                        roomStatusColor[item.status],
-                                    )}
-                                >
-                                    {item.label}
-                                    <span className="tabular-nums">
-                                        {item.count}
-                                    </span>
-                                </span>
+                                    group={item.group}
+                                    label={`${item.label} ${item.count}`}
+                                    className="px-3 py-1 text-sm"
+                                />
                             ))}
                         </CardContent>
                     </Card>

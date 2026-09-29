@@ -35,4 +35,19 @@ class Setting extends Model
     {
         static::query()->updateOrCreate(['key' => $key], ['value' => $value]);
     }
+
+    /**
+     * Every business setting, with defaults filled in for keys never saved.
+     *
+     * @return array<string, string|null>
+     */
+    public static function values(): array
+    {
+        $stored = static::query()
+            ->whereIn('key', array_keys(self::DEFAULTS))
+            ->pluck('value', 'key')
+            ->all();
+
+        return array_merge(self::DEFAULTS, $stored);
+    }
 }

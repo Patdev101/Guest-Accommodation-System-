@@ -4,11 +4,14 @@ namespace App\Models;
 
 use App\Enums\ReservationStatus;
 use App\Enums\RoomStatus;
+use Database\Factories\RoomFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -17,11 +20,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $pax_capacity
  * @property string|null $description
  * @property RoomStatus $status
+ * @property Carbon|null $created_at
+ * @property int|null $inclusions_count
  * @property-read Location $location
  */
 #[Fillable(['location_id', 'name', 'pax_capacity', 'description', 'status'])]
 class Room extends Model
 {
+    /** @use HasFactory<RoomFactory> */
+    use HasFactory;
+
     protected function casts(): array
     {
         return [
@@ -70,6 +78,25 @@ class Room extends Model
     public function activeStay(): HasOne
     {
         return $this->hasOne(Stay::class)->whereNull('checked_out_at');
+    }
+
+    /**
+     * The fields every room list and board shows.
+     *
+     * @return array{id: int, name: string, location_id: int, location: string|null, pax_capacity: int, status: string, status_label: string, group: string}
+     */
+    public function summary(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'location_id' => $this->location_id,
+            'location' => $this->relationLoaded('location') ? $this->location->name : null,
+            'pax_capacity' => $this->pax_capacity,
+            'status' => $this->status->value,
+            'status_label' => $this->status->label(),
+            'group' => $this->status->group()->value,
+        ];
     }
 
     /**

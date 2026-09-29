@@ -59,77 +59,104 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+
+    /* Room status groups (available, in use, turnover, not bookable). */
+    --color-room-available: var(--room-available);
+    --color-room-in-use: var(--room-in-use);
+    --color-room-turnover: var(--room-turnover);
+    --color-room-unavailable: var(--room-unavailable);
 }
 
+/*
+ * Mindoro Marine brand: navy #1f3c73 and teal #0e97ab, as in the
+ * requirements document. Room status colours are the dataviz skill's first
+ * four categorical slots, validated for colour-vision deficiency against
+ * these card surfaces (#ffffff light, #171a20 dark).
+ */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --background: #ffffff;
+    --foreground: #17253d;
+    --card: #ffffff;
+    --card-foreground: #17253d;
+    --popover: #ffffff;
+    --popover-foreground: #17253d;
+    --primary: #1f3c73;
+    --primary-foreground: #ffffff;
+    --secondary: #eef3fa;
+    --secondary-foreground: #1f3c73;
+    --muted: #f2f5f9;
+    --muted-foreground: #5a6a82;
+    --accent: #eef3fa;
+    --accent-foreground: #1f3c73;
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.87 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
+    --border: #e1e7ef;
+    --input: #d4ddea;
+    --ring: #0e97ab;
+    --brand: #0e97ab;
+    --brand-foreground: #0b6f7e;
+    --chart-1: #2a78d6;
+    --chart-2: #eb6834;
+    --chart-3: #1baf7a;
+    --chart-4: #eda100;
+    --chart-5: #e87ba4;
+    --room-available: #2a78d6;
+    --room-in-use: #eb6834;
+    --room-turnover: #1baf7a;
+    --room-unavailable: #eda100;
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.87 0 0);
+    --sidebar: #f5f7fb;
+    --sidebar-foreground: #17253d;
+    --sidebar-primary: #1f3c73;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e6ecf5;
+    --sidebar-accent-foreground: #1f3c73;
+    --sidebar-border: #e1e7ef;
+    --sidebar-ring: #0e97ab;
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: #0e1015;
+    --foreground: #eef2f8;
+    --card: #171a20;
+    --card-foreground: #eef2f8;
+    --popover: #171a20;
+    --popover-foreground: #eef2f8;
+    --primary: #9cb8ec;
+    --primary-foreground: #0b1a36;
+    --secondary: #232a36;
+    --secondary-foreground: #e7ecf5;
+    --muted: #1f242c;
+    --muted-foreground: #a3adbd;
+    --accent: #232a36;
+    --accent-foreground: #eef2f8;
     --destructive: oklch(0.396 0.141 25.723);
     --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    --border: #2a3039;
+    --input: #343b47;
+    --ring: #3cc0d3;
+    --brand: #3cc0d3;
+    --brand-foreground: #7fd3df;
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
+    --chart-5: #d55181;
+    --room-available: #3987e5;
+    --room-in-use: #d95926;
+    --room-turnover: #199e70;
+    --room-unavailable: #c98500;
+    --sidebar: #111318;
+    --sidebar-foreground: #e7ecf5;
+    --sidebar-primary: #9cb8ec;
+    --sidebar-primary-foreground: #0b1a36;
+    --sidebar-accent: #1f2530;
+    --sidebar-accent-foreground: #eef2f8;
+    --sidebar-border: #262b33;
+    --sidebar-ring: #3cc0d3;
 }
 
 @layer base {
