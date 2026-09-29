@@ -1,0 +1,82 @@
+<?php
+
+namespace Tests\Feature\Admin;
+
+use App\Enums\Role;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class UserManagementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_only_admins_can_open_user_management()
+    {
+        $this->actingAs(User::factory()->create())
+            ->get(route('admin.users.index'))
+            ->assertForbidden();
+
+        $this->actingAs(User::factory()->reception()->create())
+            ->get(route('admin.users.index'))
+            ->assertForbidden();
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->get(route('admin.users.index'))
+            ->assertOk();
+    }
+
+    public function test_admin_can_create_a_reception_account()
+    {
+        $this->actingAs(User::factory()->admin()->create())
+            ->post(route('admin.users.store'), [
+                'name' => 'Front Desk',
+                'email' => 'desk@example.com',
+                'role' => 'reception',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])
+            ->assertRedirect(route('admin.users.index'));
+
+        $user = User::where('email', 'desk@example.com')->firstOrFail();
+        $this->assertSame(Role::Reception, $user->role);
+        $this->assertNull($user->guest);
+    }
+
+    public function test_reception_cannot_create_accounts()
+    {
+        $this->actingAs(User::factory()->reception()->create())
+            ->post(route('admin.users.store'), [
+                'name' => 'Another Admin',
+                'email' => 'x@example.com',
+                'role' => 'admin',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('users', ['email' => 'x@example.com']);
+    }
+
+    public function test_admin_can_change_another_users_role()
+    {
+        $guest = User::factory()->create();
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->patch(route('admin.users.update', $guest), ['role' => 'reception'])
+            ->assertRedirect(route('admin.users.index'));
+
+        $this->assertSame(Role::Reception, $guest->refresh()->role);
+    }
+
+    public function test_admin_cannot_remove_their_own_admin_role()
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.users.update', $admin), ['role' => 'guest'])
+            ->assertSessionHasErrors('role');
+
+        $this->assertSame(Role::Admin, $admin->refresh()->role);
+    }
+}

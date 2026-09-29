@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Guest Accommodation Flow</title>
+        <style>
+            :root {
+                --navy: #1f3c73;
+                --navy-2: #27508f;
+                --teal: #0e97ab;
+                --amber: #d08a0a;
+                --ink: #17253d;
+                --muted: #5a6a82;
+                --bg: #eef2f7;
+                --line: #d4ddea;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--ink);
+                font-family:
+                    'Segoe UI',
+                    Inter,
+                    system-ui,
+                    -apple-system,
+                    sans-serif;
+            }
+            .page {
+                max-width: 1240px;
+                margin: 0 auto;
+                padding: 24px 16px 40px;
+            }
+
+            /* Header */
+            .hero {
+                position: relative;
+                overflow: hidden;
+                background: var(--navy);
+                color: #fff;
+                border-radius: 18px;
+                padding: 28px 32px 30px;
+            }
+            .hero::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                right: -40px;
+                width: 380px;
+                background: repeating-linear-gradient(
+                    115deg,
+                    transparent 0 34px,
+                    rgba(14, 151, 171, 0.55) 34px 48px,
+                    transparent 48px 62px,
+                    rgba(255, 255, 255, 0.1) 62px 70px,
+                    transparent 70px 96px
+                );
+            }
+            .hero > * {
+                position: relative;
+                z-index: 1;
+            }
+            .org {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: #8fdbe6;
+            }
+            .org .badge {
+                width: 34px;
+                height: 34px;
+                border-radius: 50%;
+                border: 2px solid #8fdbe6;
+                display: grid;
+                place-items: center;
+                color: #8fdbe6;
+            }
+            .hero h1 {
+                margin: 14px 0 0;
+                font-size: 36px;
+                line-height: 1.1;
+                letter-spacing: 0.01em;
+            }
+            .hero h1 span {
+                display: block;
+                color: #7fd3df;
+                font-size: 26px;
+                margin-top: 4px;
+            }
+            .hero p {
+                margin: 12px 0 0;
+                max-width: 640px;
+                color: #c9d6ea;
+                font-size: 15px;
+                line-height: 1.5;
+            }
+
+            /* Legend */
+            .legend {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px 22px;
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 14px;
+                padding: 14px 20px;
+                margin-top: 16px;
+                font-size: 13px;
+                color: var(--ink);
+            }
+            .legend b {
+                font-weight: 700;
+                margin-right: 4px;
+            }
+            .legend span {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .sw {
+                width: 14px;
+                height: 14px;
+                border-radius: 4px;
+                display: inline-block;
+            }
+            .pl {
+                width: 24px;
+                height: 14px;
+                border-radius: 5px;
+                border: 1.6px solid;
+                display: inline-block;
+            }
+
+            /* Flow sections */
+            section.flow {
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 16px;
+                margin-top: 18px;
+                overflow: hidden;
+            }
+            .flow-head {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                padding: 13px 20px;
+                background: linear-gradient(90deg, var(--navy), var(--navy-2));
+                color: #fff;
+            }
+            .num {
+                flex: none;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                background: var(--teal);
+                display: grid;
+                place-items: center;
+                font-weight: 800;
+                font-size: 15px;
+            }
+            .flow-head h2 {
+                margin: 0;
+                font-size: 17px;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+            .flow-head p {
+                margin: 0 0 0 auto;
+                font-size: 13px;
+                color: #c9d6ea;
+            }
+            .canvas {
+                padding: 12px 12px 4px;
+                overflow-x: auto;
+            }
+            .canvas svg {
+                display: block;
+                width: 100%;
+                min-width: 960px;
+                height: auto;
+                font-family: inherit;
+            }
+            .note {
+                margin: 0;
+                padding: 4px 20px 16px;
+                color: var(--muted);
+                font-size: 13px;
+                line-height: 1.5;
+            }
+            .note b {
+                color: var(--ink);
+            }
+
+            /* Key rules */
+            .rules-title {
+                margin: 26px 4px 0;
+                font-size: 15px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--navy);
+            }
+            .rules {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 14px;
+                margin-top: 12px;
+            }
+            .rule {
+                display: flex;
+                gap: 12px;
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 14px;
+                padding: 16px;
+            }
+            .rule .ico {
+                flex: none;
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+                display: grid;
+                place-items: center;
+                background: #e6f6f8;
+                color: var(--teal);
+            }
+            .rule h3 {
+                margin: 0 0 4px;
+                font-size: 15px;
+            }
+            .rule p {
+                margin: 0;
+                font-size: 13px;
+                line-height: 1.45;
+                color: var(--muted);
+            }
+
+            /* Footer */
+            .foot {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                margin-top: 22px;
+                padding: 18px 22px;
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 14px;
+            }
+            .foot .ico {
+                flex: none;
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                background: #eaf0f8;
+                color: var(--navy);
+            }
+            .foot p {
+                margin: 0 0 4px;
+                font-size: 14px;
+                color: var(--ink);
+            }
+            .foot strong {
+                color: var(--teal);
+                letter-spacing: 0.06em;
+                font-size: 14px;
+            }
+            .stripe {
+                height: 10px;
+                margin-top: 18px;
+                border-radius: 6px;
+                background: linear-gradient(
+                    100deg,
+                    var(--navy) 0 82%,
+                    #fff 82% 83%,
+                    var(--teal) 83%
+                );
+            }
+
+            @media (max-width: 860px) {
+                .rules {
+                    grid-template-columns: 1fr;
+                }
+                .flow-head p {
+                    display: none;
+                }
+                .hero {
+                    padding: 22px 20px;
+                }
+                .hero h1 {
+                    font-size: 27px;
+                }
+                .hero h1 span {
+                    font-size: 20px;
+                }
+                .hero::after {
+                    width: 160px;
+                    opacity: 0.6;
+                }
+            }
+            @media print {
+                @page {
+                    size: A3 portrait;
+                    margin: 10mm;
+                }
+                body {
+                    background: #fff;
+                }
+                .page {
+                    max-width: none;
+                    padding: 0;
+                }
+                section.flow,
+                .rule,
+                .foot {
+                    break-inside: avoid;
+                }
+                .canvas {
+                    overflow: visible;
+                }
+                .canvas svg {
+                    min-width: 0;
+                }
+                /* Headless print can match the narrow-screen query; keep the desktop layout on paper. */
+                .rules {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+                .flow-head p {
+                    display: block;
+                }
+                .hero {
+                    padding: 28px 32px 30px;
+                }
+                .hero h1 {
+                    font-size: 36px;
+                }
+                .hero h1 span {
+                    font-size: 26px;
+                }
+                .hero::after {
+                    width: 380px;
+                    opacity: 1;
+                }
+                .sheet-2 {
+                    break-before: page;
+                    margin-top: 0;
+                }
+                /* Tighter spacing so each A3 sheet holds its half of the poster. */
+                .page {
+                    zoom: 0.87;
+                }
+                section.flow {
+                    margin-top: 12px;
+                }
+                .canvas {
+                    padding-top: 8px;
+                }
+                .note {
+                    padding-bottom: 10px;
+                }
+                .rules-title {
+                    margin-top: 16px;
+                }
+                .rules {
+                    gap: 10px;
+                    margin-top: 8px;
+                }
+                .rule {
+                    padding: 12px 14px;
+                }
+                .foot {
+                    margin-top: 12px;
+                    padding: 12px 18px;
+                }
+                .stripe {
+                    margin-top: 10px;
+                }
+                * {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page">
+            <header class="hero">
+                <div class="org">
+                    <span class="badge" data-i="anchor"></span>Mindoro Marine
+                    Manufacturing Corporation
+                </div>
+                <h1>
+                    Guest Accommodation<span
+                        >Check-in &amp; Check-out Process Flow</span
+                    >
+                </h1>
+                <p>
+                    How guests, reception and the system work together, from
+                    arrival or online booking through extension, check-out and
+                    room turnover.
+                </p>
+            </header>
+
+            <div class="legend">
+                <b>Who acts:</b>
+                <span><i class="sw" style="background: #0e97ab"></i>Guest</span>
+                <span
+                    ><i class="sw" style="background: #1f3c73"></i
+                    >Reception</span
+                >
+                <span
+                    ><i class="sw" style="background: #d08a0a"></i>System
+                    (automatic)</span
+                >
+                <b style="margin-left: 10px">Shapes:</b>
+                <span
+                    ><svg width="20" height="16" viewBox="0 0 20 16">
+                        <path
+                            d="M10 1L19 8L10 15L1 8Z"
+                            fill="#eef3fa"
+                            stroke="#1f3c73"
+                            stroke-width="1.5"
+                        /></svg
+                    >Decision</span
+                >
+                <span
+                    ><i
+                        class="pl"
+                        style="background: #e8f6ee; border-color: #1e8e4e"
+                    ></i
+                    >Allowed</span
+                >
+                <span
+                    ><i
+                        class="pl"
+                        style="background: #fdf4e3; border-color: #c47f0a"
+                    ></i
+                    >On hold</span
+                >
+                <span
+                    ><i
+                        class="pl"
+                        style="background: #fdeeee; border-color: #c53030"
+                    ></i
+                    >Stopped / denied</span
+                >
+                <span
+                    ><i
+                        class="pl"
+                        style="
+                            background: #e8f7f9;
+                            border-color: #0e97ab;
+                            border-style: dashed;
+                        "
+                    ></i
+                    >Continues in another flow</span
+                >
+            </div>
+
+            <section class="flow">
+                <div class="flow-head">
+                    <span class="num">1</span>
+                    <h2>Check-in process</h2>
+                    <p>Arrival to room</p>
+                </div>
+                <div class="canvas">
+                    <svg
+                        id="f1"
+                        role="img"
+                        aria-label="Check-in process flowchart"
+                    ></svg>
+                </div>
+                <p class="note">
+                    <b>Required at check-in:</b> contact number, pax and
+                    expected check-out time. The ID is taken only once a room is
+                    confirmed. Failed verifications are logged.
+                </p>
+            </section>
+
+            <section class="flow">
+                <div class="flow-head">
+                    <span class="num">2</span>
+                    <h2>Reservation</h2>
+                    <p>Online or walk-in booking</p>
+                </div>
+                <div class="canvas">
+                    <svg
+                        id="f2"
+                        role="img"
+                        aria-label="Reservation flowchart"
+                    ></svg>
+                </div>
+                <p class="note">
+                    <b>Payment is optional</b>, with no minimum downpayment.
+                    Guests and reception can cancel anytime; payments on a
+                    cancellation or no-show are refunded (full by default)
+                    through Requested → Processing → Refunded.
+                </p>
+            </section>
+
+            <section class="flow sheet-2">
+                <div class="flow-head">
+                    <span class="num">3</span>
+                    <h2>Check-out reminder &amp; extension</h2>
+                    <p>1 hour before check-out</p>
+                </div>
+                <div class="canvas">
+                    <svg
+                        id="f3"
+                        role="img"
+                        aria-label="Check-out reminder and extension flowchart"
+                    ></svg>
+                </div>
+                <p class="note">
+                    <b>Guest B must agree to move</b> before the extension is
+                    allowed. Every reminder, call and extension is logged: old
+                    time, new time, price, who approved it, and when.
+                </p>
+            </section>
+
+            <section class="flow">
+                <div class="flow-head">
+                    <span class="num">4</span>
+                    <h2>Check-out process</h2>
+                    <p>Billing &amp; ID custody</p>
+                </div>
+                <div class="canvas">
+                    <svg
+                        id="f4"
+                        role="img"
+                        aria-label="Check-out process flowchart"
+                    ></svg>
+                </div>
+                <p class="note">
+                    <b>Charges are billed to the company by default</b> (or to
+                    the guest if reception switches it). The surrendered ID is
+                    returned only when the company or the guest has settled
+                    everything, including damages.
+                </p>
+            </section>
+
+            <section class="flow">
+                <div class="flow-head">
+                    <span class="num">5</span>
+                    <h2>Room status flow</h2>
+                    <p>Lifecycle of every room</p>
+                </div>
+                <div class="canvas">
+                    <svg id="f5" role="img" aria-label="Room status flow"></svg>
+                </div>
+                <p class="note">
+                    <b>Reservations are tracked separately from room status</b>,
+                    so an occupied room can still be reserved for later. After
+                    the current stay, a room opens for booking only once its
+                    guest confirms they are not extending.
+                </p>
+            </section>
+
+            <h2 class="rules-title">Key rules</h2>
+            <div class="rules">
+                <div class="rule">
+                    <span class="ico" data-i="users"></span>
+                    <div>
+                        <h3>One booking per room</h3>
+                        <p>
+                            Rooms are never shared between separate guests. Pax
+                            is the maximum number of people in that one booking.
+                        </p>
+                    </div>
+                </div>
+                <div class="rule">
+                    <span class="ico" data-i="lock"></span>
+                    <div>
+                        <h3>ID stays until paid</h3>
+                        <p>
+                            The guest may leave with charges unpaid, but
+                            reception keeps the ID until the company or the
+                            guest settles the bill.
+                        </p>
+                    </div>
+                </div>
+                <div class="rule">
+                    <span class="ico" data-i="bell"></span>
+                    <div>
+                        <h3>1-hour reminder</h3>
+                        <p>
+                            The guest gets an in-app notice and a call from
+                            reception. Their answer updates availability for
+                            everyone.
+                        </p>
+                    </div>
+                </div>
+                <div class="rule">
+                    <span class="ico" data-i="clock"></span>
+                    <div>
+                        <h3>1-hour no-show</h3>
+                        <p>
+                            A reserved room is held 1 hour past the reserved
+                            time. After that, reception may release it; payments
+                            are refunded.
+                        </p>
+                    </div>
+                </div>
+                <div class="rule">
+                    <span class="ico" data-i="coin"></span>
+                    <div>
+                        <h3>Flexible payment</h3>
+                        <p>
+                            Pay in full, pay a downpayment of any amount, or pay
+                            later. The Admin sets every room and extension
+                            price.
+                        </p>
+                    </div>
+                </div>
+                <div class="rule">
+                    <span class="ico" data-i="sparkle"></span>
+                    <div>
+                        <h3>Ready means cleaned</h3>
+                        <p>
+                            After check-out, a room goes through inspection and
+                            cleaning or maintenance. Reception marks it done
+                            before the next guest enters.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="foot">
+                <span class="ico" data-i="shield"></span>
+                <div>
+                    <p>
+                        For the safety and security of all guests and the
+                        protection of company property, please follow the
+                        check-in and check-out procedures at all times.
+                    </p>
+                    <strong>THANK YOU FOR YOUR COOPERATION.</strong>
+                </div>
+            </footer>
+            <div class="stripe"></div>
+        </div>
+
+        <script src="assets/flowcharts.js"></script>
+    </body>
+</html>
