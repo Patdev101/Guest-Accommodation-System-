@@ -18,6 +18,8 @@ class SettingsRequest extends FormRequest
             'cleaning_buffer_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
             'no_show_grace_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
             'checkout_reminder_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
+            'standard_check_in_time' => ['required', 'date_format:H:i'],
+            'standard_check_out_time' => ['required', 'date_format:H:i'],
             'no_show_refund' => ['required', Rule::enum(NoShowRefund::class)],
             // Only a partial refund uses the percentage; for full or none it is
             // ignored (the controller stores 100 or 0).
@@ -37,6 +39,8 @@ class SettingsRequest extends FormRequest
             'cleaning_buffer_minutes' => 'cleaning buffer',
             'no_show_grace_minutes' => 'no-show grace period',
             'checkout_reminder_minutes' => 'check-out reminder',
+            'standard_check_in_time' => 'standard check-in time',
+            'standard_check_out_time' => 'standard check-out time',
             'no_show_refund' => 'no-show refund',
             'no_show_refund_percent' => 'refund percentage',
         ];

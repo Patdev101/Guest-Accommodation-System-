@@ -12,8 +12,10 @@ use App\Models\MaintenanceRecord;
 use App\Models\RateUnit;
 use App\Models\Room;
 use App\Models\RoomInclusion;
+use App\Models\RoomPhoto;
 use App\Models\RoomRate;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,7 +24,7 @@ class RoomController extends Controller
     public function index(): Response
     {
         $rooms = Room::query()
-            ->with(['location:id,name', 'rates.unit'])
+            ->with(['location:id,name', 'rates.unit', 'coverPhoto'])
             ->withCount('inclusions')
             ->get()
             ->sortBy(fn (Room $room) => $room->location->name."\0".$room->name, SORT_NATURAL | SORT_FLAG_CASE)
@@ -60,7 +62,7 @@ class RoomController extends Controller
 
     public function show(Room $room): Response
     {
-        $room->load(['location', 'inclusions', 'rates.unit', 'maintenanceRecords.recorder']);
+        $room->load(['location', 'inclusions', 'rates.unit', 'maintenanceRecords.recorder', 'photos']);
 
         return Inertia::render('admin/rooms/show', [
             'room' => [
@@ -75,6 +77,8 @@ class RoomController extends Controller
                 'description' => $status->description(),
                 'group' => $status->group()->value,
             ], $room->status->manualTransitions()),
+            'photos' => $room->photos->map(fn (RoomPhoto $photo) => $photo->toCard()),
+            'maxPhotos' => RoomPhoto::MAX_PER_ROOM,
             'inclusions' => $room->inclusions
                 ->sortBy('item', SORT_NATURAL | SORT_FLAG_CASE)
                 ->values()
@@ -131,6 +135,7 @@ class RoomController extends Controller
         }
 
         $room->delete();
+        Storage::disk('public')->deleteDirectory("rooms/{$room->id}");
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __(':name deleted.', ['name' => $room->name])]);
 

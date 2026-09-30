@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\RoomStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Services\FrontDeskAlerts;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,14 @@ use Inertia\Inertia;
 class RoomStatusController extends Controller
 {
     public function __invoke(Request $request, Room $room): RedirectResponse
+    {
+        $this->change($request, $room);
+
+        return to_route('admin.rooms.show', $room);
+    }
+
+    /** Validate and apply a manual status change, with its maintenance record. */
+    protected function change(Request $request, Room $room): void
     {
         $from = $room->status;
         $allowed = array_map(fn (RoomStatus $status) => $status->value, $from->manualTransitions());
@@ -62,11 +71,16 @@ class RoomStatusController extends Controller
             $room->update(['status' => $to]);
         });
 
+        // Rule 27: tell the front desk the room is ready; tell the Admin a room is out of use.
+        if ($to === RoomStatus::Available) {
+            app(FrontDeskAlerts::class)->roomReady($room, $request->user());
+        } elseif (in_array($to, [RoomStatus::UnderMaintenance, RoomStatus::OutOfService], true)) {
+            app(FrontDeskAlerts::class)->roomOutOfUse($room, $to, $validated['issue'] ?? null, $request->user());
+        }
+
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __(':name is now :status.', ['name' => $room->name, 'status' => strtolower($to->label())]),
         ]);
-
-        return to_route('admin.rooms.show', $room);
     }
 }

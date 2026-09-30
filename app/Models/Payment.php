@@ -2,18 +2,46 @@
 
 namespace App\Models;
 
+use App\Concerns\CastsKeysToIntegers;
+use App\Concerns\LogsActivity;
 use App\Enums\BilledTo;
 use App\Enums\PaymentType;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int|null $stay_id
+ * @property int|null $reservation_id
+ * @property string $amount
+ * @property PaymentType $payment_type
+ * @property BilledTo $paid_by
+ * @property string $method
+ * @property string|null $receipt_number
+ * @property int $received_by
+ * @property CarbonImmutable $paid_at
+ * @property-read User $receiver
+ */
 #[Fillable([
     'stay_id', 'reservation_id', 'amount', 'payment_type', 'paid_by', 'method',
     'receipt_number', 'received_by', 'paid_at',
 ])]
 class Payment extends Model
 {
+    use CastsKeysToIntegers, LogsActivity;
+
+    /** How money can be received at the front desk. */
+    public const METHODS = ['Cash', 'GCash', 'Maya', 'Bank transfer', 'Card', 'Other'];
+
+    public function activityLabel(): string
+    {
+        $for = $this->reservation_id !== null ? "reservation #{$this->reservation_id}" : "stay #{$this->stay_id}";
+
+        return 'payment of ₱'.number_format((float) $this->amount, 2)." ({$this->method}) on {$for}";
+    }
+
     protected function casts(): array
     {
         return [

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RoomRateRequest;
-use App\Models\Reservation;
+use App\Models\ReservationRoom;
 use App\Models\Room;
 use App\Models\RoomRate;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +32,7 @@ class RoomRateController extends Controller
 
     public function destroy(Room $room, RoomRate $rate): RedirectResponse
     {
-        if (Reservation::query()->where('room_rate_id', $rate->id)->exists()) {
+        if (ReservationRoom::query()->where('room_rate_id', $rate->id)->exists()) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('Reservations use this rate, so it cannot be deleted. Change its price instead.')]);
 
             return to_route('admin.rooms.show', $room);

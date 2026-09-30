@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\CastsKeysToIntegers;
 use App\Enums\VerificationResult;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable(['guest_id', 'result', 'notes', 'verified_by', 'attempted_at'])]
 class VerificationAttempt extends Model
 {
+    use CastsKeysToIntegers;
+
     protected function casts(): array
     {
         return [

@@ -13,6 +13,7 @@ import { RoomFormDialog } from '@/components/admin/room-form-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { Page, PageHeader } from '@/components/page';
 import { RoomStatusBadge, StatusDot } from '@/components/room-status-badge';
+import { RoomThumb } from '@/components/room-thumb';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -327,20 +328,29 @@ export default function Rooms({ rooms, locations, statuses }: Props) {
                                                 }
                                             >
                                                 <TableCell className="pl-4">
-                                                    <Link
-                                                        href={roomsShow(
-                                                            room.id,
-                                                        )}
-                                                        className="font-medium underline-offset-4 hover:underline"
-                                                        onClick={(event) =>
-                                                            event.stopPropagation()
-                                                        }
-                                                    >
-                                                        {room.name}
-                                                    </Link>
-                                                    <p className="text-xs text-muted-foreground md:hidden">
-                                                        {room.location}
-                                                    </p>
+                                                    <div className="flex items-center gap-3">
+                                                        <RoomThumb
+                                                            url={room.cover_url}
+                                                        />
+                                                        <div>
+                                                            <Link
+                                                                href={roomsShow(
+                                                                    room.id,
+                                                                )}
+                                                                className="font-medium underline-offset-4 hover:underline"
+                                                                onClick={(
+                                                                    event,
+                                                                ) =>
+                                                                    event.stopPropagation()
+                                                                }
+                                                            >
+                                                                {room.name}
+                                                            </Link>
+                                                            <p className="text-xs text-muted-foreground md:hidden">
+                                                                {room.location}
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="hidden text-muted-foreground md:table-cell">
                                                     {room.location}

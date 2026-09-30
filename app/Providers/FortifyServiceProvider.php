@@ -4,12 +4,15 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
@@ -41,6 +44,23 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+
+        // Deactivated accounts cannot log in, and are told why.
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::query()->where('email', $request->string(Fortify::username()))->first();
+
+            if (! $user || ! Hash::check($request->string('password')->toString(), $user->password)) {
+                return null;
+            }
+
+            if (! $user->isActive()) {
+                throw ValidationException::withMessages([
+                    Fortify::username() => __('This account has been deactivated. Please contact the administrator.'),
+                ]);
+            }
+
+            return $user;
+        });
     }
 
     /**
@@ -79,7 +99,19 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
-            return Limit::perMinute(5)->by($throttleKey);
+            // After 5 wrong tries in a minute, show the wait as a normal form
+            // error under the email field instead of a bare 429 page.
+            return Limit::perMinute(5)->by($throttleKey)->response(
+                function (Request $request, array $headers) {
+                    $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+                    return back()
+                        ->withInput($request->only(Fortify::username()))
+                        ->withErrors([
+                            Fortify::username() => __('Too many login attempts. Please wait :seconds seconds and try again.', ['seconds' => $seconds]),
+                        ]);
+                },
+            );
         });
 
     }

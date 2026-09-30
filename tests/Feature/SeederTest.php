@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Models\IdType;
 use App\Models\RateUnit;
 use App\Models\Setting;
 use App\Models\User;
@@ -19,6 +20,7 @@ class SeederTest extends TestCase
         $this->seed();
 
         $this->assertSame(RateUnit::DEFAULTS, RateUnit::orderBy('id')->pluck('name')->all());
+        $this->assertSame(IdType::DEFAULTS, IdType::orderBy('id')->pluck('name')->all());
         $this->assertSame(1, User::where('role', Role::Admin)->count());
 
         $this->assertSame('0', Setting::get('cleaning_buffer_minutes'));

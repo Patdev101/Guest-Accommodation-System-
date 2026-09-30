@@ -18,6 +18,9 @@ class Setting extends Model
         'checkout_reminder_minutes' => '60',
         'no_show_refund' => 'full',
         'no_show_refund_percent' => '100',
+        // What "Overnight" and a standard stay mean (24-hour HH:MM).
+        'standard_check_in_time' => '14:00',
+        'standard_check_out_time' => '12:00',
     ];
 
     protected $primaryKey = 'key';
@@ -31,9 +34,26 @@ class Setting extends Model
         return static::query()->find($key)->value ?? self::DEFAULTS[$key] ?? null;
     }
 
+    /** Readable names for the activity log. */
+    public const LABELS = [
+        'cleaning_buffer_minutes' => 'Cleaning buffer (minutes)',
+        'no_show_grace_minutes' => 'No-show grace period (minutes)',
+        'checkout_reminder_minutes' => 'Check-out reminder (minutes before)',
+        'no_show_refund' => 'No-show refund',
+        'no_show_refund_percent' => 'No-show refund percentage',
+        'standard_check_in_time' => 'Standard check-in time',
+        'standard_check_out_time' => 'Standard check-out time',
+    ];
+
     public static function set(string $key, ?string $value): void
     {
-        static::query()->updateOrCreate(['key' => $key], ['value' => $value]);
+        $old = static::query()->whereKey($key)->value('value') ?? self::DEFAULTS[$key] ?? null;
+        $setting = static::query()->updateOrCreate(['key' => $key], ['value' => $value]);
+
+        // Only real business settings are logged, and only when they change.
+        if (isset(self::LABELS[$key]) && $old !== $value) {
+            ActivityLog::record('updated', $setting, 'Changed setting: '.self::LABELS[$key], [$key => [$old, $value]]);
+        }
     }
 
     /**

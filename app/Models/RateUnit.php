@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +15,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name'])]
 class RateUnit extends Model
 {
+    use LogsActivity;
+
+    public function activityLabel(): string
+    {
+        return "rate unit \"{$this->name}\"";
+    }
+
     /** Units the system starts with; the Admin can add more. */
     public const DEFAULTS = ['Per hour', 'Overnight', 'Day tour'];
 

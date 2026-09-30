@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\LogsActivity;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Location extends Model
 {
     /** @use HasFactory<LocationFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    public function activityLabel(): string
+    {
+        return "location \"{$this->name}\"";
+    }
 
     /** @return HasMany<Room, $this> */
     public function rooms(): HasMany

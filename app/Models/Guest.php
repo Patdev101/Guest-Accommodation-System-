@@ -2,15 +2,27 @@
 
 namespace App\Models;
 
+use App\Concerns\CastsKeysToIntegers;
 use App\Enums\GuestType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'name', 'type', 'company', 'contact_number'])]
+/**
+ * @property int $id
+ * @property int|null $user_id
+ * @property string $name
+ * @property GuestType $type
+ * @property string|null $company
+ * @property string $contact_number
+ * @property string|null $email
+ */
+#[Fillable(['user_id', 'name', 'type', 'company', 'contact_number', 'email'])]
 class Guest extends Model
 {
+    use CastsKeysToIntegers;
+
     protected function casts(): array
     {
         return ['type' => GuestType::class];

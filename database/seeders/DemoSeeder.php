@@ -2,16 +2,22 @@
 
 namespace Database\Seeders;
 
+use App\Enums\BookingChannel;
 use App\Enums\GuestType;
 use App\Enums\IdCustodyStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\Role;
 use App\Enums\RoomStatus;
 use App\Enums\VerificationResult;
 use App\Models\Guest;
+use App\Models\IdType;
 use App\Models\Location;
 use App\Models\RateUnit;
+use App\Models\Reservation;
 use App\Models\Room;
+use App\Models\Stay;
 use App\Models\User;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +28,9 @@ use Illuminate\Support\Facades\DB;
  */
 class DemoSeeder extends Seeder
 {
+    // Sample data is not "activity": skip model events (and so the activity log).
+    use WithoutModelEvents;
+
     public function run(): void
     {
         if (Location::query()->exists()) {
@@ -169,17 +178,43 @@ class DemoSeeder extends Seeder
             'attempted_at' => now()->subHours(3),
         ]);
 
-        $stay = $room->stays()->create([
+        $pax = min($pax, $room->pax_capacity);
+        $rate = $room->rates()->where('is_extension_rate', false)->first();
+
+        $reservation = Reservation::create([
+            'guest_id' => $guest->id,
+            'company' => $company,
+            'purpose' => $company ? 'Contract work' : 'Visit',
+            'starts_at' => now()->subHours(3),
+            'ends_at' => now()->addDay()->setTime(12, 0),
+            'total' => $rate->price ?? 0,
+            'status' => ReservationStatus::CheckedIn,
+            'booked_via' => BookingChannel::Reception,
+            'booked_by' => $admin->id,
+        ]);
+        $reservation->rooms()->create(['room_id' => $room->id, 'room_rate_id' => $rate?->id, 'pax' => $pax, 'price' => $rate->price ?? 0]);
+
+        $stay = Stay::create([
+            'reservation_id' => $reservation->id,
             'guest_id' => $guest->id,
             'verification_attempt_id' => $attempt->id,
-            'pax' => min($pax, $room->pax_capacity),
-            'checked_in_at' => now()->subHours(3),
-            'expected_check_out_at' => now()->addDay()->setTime(12, 0),
+            'checked_in_at' => $reservation->starts_at,
+            'expected_check_out_at' => $reservation->ends_at,
             'checked_in_by' => $admin->id,
         ]);
+        $stay->rooms()->create(['room_id' => $room->id, 'pax' => $pax]);
+
+        foreach (range(1, $pax) as $number) {
+            $stay->guests()->create([
+                'room_id' => $room->id,
+                'name' => $number === 1 ? $name : "Guest {$number} of {$name}",
+                'address' => 'Calapan City, Oriental Mindoro',
+                'contact_number' => $number === 1 ? $guest->contact_number : null,
+            ]);
+        }
 
         $stay->idCustody()->create([
-            'id_type' => 'Driver’s license',
+            'id_type_id' => IdType::query()->where('name', 'Driver’s License')->value('id'),
             'id_number' => 'N01-'.random_int(10, 99).'-'.random_int(100000, 999999),
             'status' => IdCustodyStatus::Held,
             'received_by' => $admin->id,

@@ -1,5 +1,16 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BedDouble, LayoutGrid, MapPin, Settings2, Users } from 'lucide-react';
+import {
+    BedDouble,
+    BedSingle,
+    CalendarCheck,
+    CalendarDays,
+    HandCoins,
+    History,
+    LayoutGrid,
+    MapPin,
+    Settings2,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -13,20 +24,45 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as activityIndex } from '@/routes/admin/activity';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as roomsIndex } from '@/routes/admin/rooms';
 import { edit as settingsEdit } from '@/routes/admin/settings';
 import { index as usersIndex } from '@/routes/admin/users';
+import { calendar } from '@/routes/reception';
+import { index as refundsIndex } from '@/routes/reception/refunds';
+import { index as reservationsIndex } from '@/routes/reception/reservations';
+import { index as staysIndex } from '@/routes/reception/stays';
 import type { NavItem, Role } from '@/types';
 
 type NavSection = { label: string; roles: Role[]; items: NavItem[] };
 
-// Reception and guest screens come in later phases; they see the dashboard only.
+// Guest screens come in a later phase; guests see the dashboard only.
 const sections: NavSection[] = [
     {
         label: 'Overview',
         roles: ['guest', 'reception', 'admin'],
         items: [{ title: 'Dashboard', href: dashboard(), icon: LayoutGrid }],
+    },
+    {
+        label: 'Front desk',
+        roles: ['reception', 'admin'],
+        items: [
+            {
+                title: 'Reservations',
+                href: reservationsIndex(),
+                icon: CalendarCheck,
+                matchChildren: true,
+            },
+            { title: 'Calendar', href: calendar(), icon: CalendarDays },
+            {
+                title: 'In house',
+                href: staysIndex(),
+                icon: BedSingle,
+                matchChildren: true,
+            },
+            { title: 'Refunds', href: refundsIndex(), icon: HandCoins },
+        ],
     },
     {
         label: 'Setup',
@@ -45,7 +81,10 @@ const sections: NavSection[] = [
     {
         label: 'Accounts',
         roles: ['admin'],
-        items: [{ title: 'Users', href: usersIndex(), icon: Users }],
+        items: [
+            { title: 'Users', href: usersIndex(), icon: Users },
+            { title: 'Activity log', href: activityIndex(), icon: History },
+        ],
     },
 ];
 

@@ -1,10 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import RoomController from '@/actions/App/Http/Controllers/Admin/RoomController';
+import { RoomCopyDialog } from '@/components/admin/room-copy-dialog';
 import { RoomFormDialog } from '@/components/admin/room-form-dialog';
 import { RoomInclusions } from '@/components/admin/room-inclusions';
 import { RoomMaintenance } from '@/components/admin/room-maintenance';
+import { RoomPhotos } from '@/components/admin/room-photos';
+import type { RoomPhoto } from '@/components/admin/room-photos';
 import { RoomRates } from '@/components/admin/room-rates';
 import { RoomStatusPanel } from '@/components/admin/room-status-panel';
 import type { Transition } from '@/components/admin/room-status-panel';
@@ -32,6 +35,8 @@ type Props = {
         created_at: string | null;
     };
     transitions: Transition[];
+    photos: RoomPhoto[];
+    maxPhotos: number;
     inclusions: RoomInclusion[];
     rates: RoomRate[];
     maintenance: MaintenanceRecord[];
@@ -43,6 +48,8 @@ type Props = {
 export default function RoomShow({
     room,
     transitions,
+    photos,
+    maxPhotos,
     inclusions,
     rates,
     maintenance,
@@ -52,6 +59,7 @@ export default function RoomShow({
 }: Props) {
     const [editing, setEditing] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [copying, setCopying] = useState(false);
 
     return (
         <>
@@ -80,6 +88,13 @@ export default function RoomShow({
                             <>
                                 <Button
                                     variant="outline"
+                                    onClick={() => setCopying(true)}
+                                >
+                                    <Copy />
+                                    Copy room
+                                </Button>
+                                <Button
+                                    variant="outline"
                                     onClick={() => setEditing(true)}
                                 >
                                     <Pencil />
@@ -100,6 +115,11 @@ export default function RoomShow({
 
                 <div className="grid items-start gap-6 lg:grid-cols-3">
                     <div className="flex flex-col gap-6 lg:col-span-2">
+                        <RoomPhotos
+                            roomId={room.id}
+                            photos={photos}
+                            max={maxPhotos}
+                        />
                         <RoomRates
                             roomId={room.id}
                             rates={rates}
@@ -193,6 +213,14 @@ export default function RoomShow({
                     </div>
                 </div>
             </Page>
+
+            <RoomCopyDialog
+                key={room.id}
+                open={copying}
+                onOpenChange={setCopying}
+                room={room}
+                locations={locations}
+            />
 
             <RoomFormDialog
                 open={editing}

@@ -334,16 +334,16 @@ class RoomManagementTest extends TestCase
     {
         $guest = Guest::create(['name' => 'Juan', 'contact_number' => '09170000000']);
 
-        return Reservation::create([
+        $reservation = Reservation::create([
             'guest_id' => $guest->id,
-            'room_id' => $room->id,
-            'room_rate_id' => $rate?->id,
-            'pax' => 1,
             'starts_at' => now()->addDay(),
             'ends_at' => now()->addDays(2),
             'status' => ReservationStatus::Active,
             'booked_via' => BookingChannel::Reception,
             'booked_by' => $this->admin->id,
         ]);
+        $reservation->rooms()->create(['room_id' => $room->id, 'room_rate_id' => $rate?->id, 'pax' => 1]);
+
+        return $reservation;
     }
 }

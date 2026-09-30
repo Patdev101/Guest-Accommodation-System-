@@ -22,7 +22,9 @@ export function FormField({
     children: ReactNode;
 }) {
     return (
-        <div className={cn('grid gap-2', className)}>
+        // content-start: in a row where a neighbour is taller (e.g. it has a
+        // hint), keep the label and control at the top instead of spreading out.
+        <div className={cn('grid content-start gap-2', className)}>
             <Label htmlFor={htmlFor}>
                 {label}
                 {optional && (

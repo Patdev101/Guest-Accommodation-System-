@@ -60,11 +60,15 @@ class AuthenticationTest extends TestCase
 
         RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 5);
 
-        $response = $this->post(route('login.store'), [
+        $response = $this->from(route('login'))->post(route('login.store'), [
             'email' => $user->email,
-            'password' => 'wrong-password',
+            'password' => 'password',
         ]);
 
-        $response->assertTooManyRequests();
+        // Blocked even with the right password, shown as a form error.
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHasErrors('email');
+        $this->assertStringContainsString('Too many login attempts', session('errors')->first('email'));
+        $this->assertGuest();
     }
 }

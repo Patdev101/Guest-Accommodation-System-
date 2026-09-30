@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use App\Enums\ReservationStatus;
+use App\Concerns\CastsKeysToIntegers;
+use App\Concerns\LogsActivity;
 use App\Enums\RoomStatus;
 use Database\Factories\RoomFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
@@ -23,12 +25,34 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property int|null $inclusions_count
  * @property-read Location $location
+ * @property-read RoomPhoto|null $coverPhoto
  */
 #[Fillable(['location_id', 'name', 'pax_capacity', 'description', 'status'])]
 class Room extends Model
 {
+    use CastsKeysToIntegers;
+
     /** @use HasFactory<RoomFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    public function activityLabel(): string
+    {
+        $location = Location::query()->whereKey($this->location_id)->value('name');
+
+        return "room {$this->name}".($location ? " ({$location})" : '');
+    }
+
+    /**
+     * @param  array<string, array{0: mixed, 1: mixed}>  $changes
+     */
+    protected function activityUpdateDescription(array $changes): string
+    {
+        if (array_keys($changes) === ['status']) {
+            return "Changed {$this->activityLabel()} to {$this->status->label()}";
+        }
+
+        return 'Updated '.$this->activityLabel();
+    }
 
     protected function casts(): array
     {
@@ -62,32 +86,39 @@ class Room extends Model
         return $this->hasMany(MaintenanceRecord::class);
     }
 
-    /** @return HasMany<Reservation, $this> */
-    public function reservations(): HasMany
+    /** @return BelongsToMany<Reservation, $this> */
+    public function reservations(): BelongsToMany
     {
-        return $this->hasMany(Reservation::class);
+        return $this->belongsToMany(Reservation::class, 'reservation_rooms')->withPivot(['pax', 'price', 'room_rate_id']);
     }
 
-    /** @return HasMany<Stay, $this> */
-    public function stays(): HasMany
+    /** @return BelongsToMany<Stay, $this> */
+    public function stays(): BelongsToMany
     {
-        return $this->hasMany(Stay::class);
+        return $this->belongsToMany(Stay::class, 'stay_rooms')->withPivot('pax');
     }
 
-    /** @return HasOne<Stay, $this> */
-    public function activeStay(): HasOne
+    /** @return HasMany<RoomPhoto, $this> */
+    public function photos(): HasMany
     {
-        return $this->hasOne(Stay::class)->whereNull('checked_out_at');
+        return $this->hasMany(RoomPhoto::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** @return HasOne<RoomPhoto, $this> */
+    public function coverPhoto(): HasOne
+    {
+        return $this->hasOne(RoomPhoto::class)->where('is_cover', true);
     }
 
     /**
      * The fields every room list and board shows.
      *
-     * @return array{id: int, name: string, location_id: int, location: string|null, pax_capacity: int, status: string, status_label: string, group: string}
+     * @return array{id: int, name: string, location_id: int, location: string|null, pax_capacity: int, status: string, status_label: string, group: string, cover_url: string|null}
      */
     public function summary(): array
     {
         return [
+            'cover_url' => $this->relationLoaded('coverPhoto') ? $this->coverPhoto?->url() : null,
             'id' => $this->id,
             'name' => $this->name,
             'location_id' => $this->location_id,
@@ -97,17 +128,5 @@ class Room extends Model
             'status_label' => $this->status->label(),
             'group' => $this->status->group()->value,
         ];
-    }
-
-    /**
-     * The next active reservation, which the room board shows as "Reserved".
-     *
-     * @return HasOne<Reservation, $this>
-     */
-    public function nextReservation(): HasOne
-    {
-        return $this->hasOne(Reservation::class)
-            ->where('status', ReservationStatus::Active)
-            ->orderBy('starts_at');
     }
 }

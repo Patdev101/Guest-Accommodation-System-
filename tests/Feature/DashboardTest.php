@@ -32,17 +32,21 @@ class DashboardTest extends TestCase
                 ->missing('stats'));
     }
 
-    public function test_reception_sees_front_desk_stats_and_room_statuses()
+    public function test_reception_sees_the_front_desk_day()
     {
+        Room::factory()->create(['name' => 'Villa 1']);
+
         $this->actingAs(User::factory()->reception()->create())
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('dashboard')
-                ->has('stats.arrivalsToday')
-                ->has('stats.idsPendingPayment')
-                ->has('roomStatuses', 7)
-                ->missing('reservations'));
+                ->component('reception/dashboard')
+                ->where('stats.arrivalsToday', 0)
+                ->has('stats.openRefunds')
+                ->has('arrivals', 0)
+                ->has('overdue', 0)
+                ->has('groups', 4)
+                ->where('board.0.rooms.0.name', 'Villa 1'));
     }
 
     public function test_admin_gets_the_admin_dashboard_with_a_setup_checklist()

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\CastsKeysToIntegers;
+use App\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +20,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['room_id', 'rate_unit_id', 'name', 'price', 'is_extension_rate'])]
 class RoomRate extends Model
 {
+    use CastsKeysToIntegers, LogsActivity;
+
+    public function activityLabel(): string
+    {
+        $kind = $this->is_extension_rate ? 'extension rate' : 'rate';
+
+        return "{$kind} \"{$this->name}\" on room ".Room::query()->whereKey($this->room_id)->value('name');
+    }
+
     protected function casts(): array
     {
         return [

@@ -2,12 +2,21 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useInitials } from '@/hooks/use-initials';
 import type { User } from '@/types';
 
+const roleLabel: Record<User['role'], string> = {
+    admin: 'Admin',
+    reception: 'Reception',
+    guest: 'Guest',
+};
+
 export function UserInfo({
     user,
     showEmail = false,
+    showRole = false,
 }: {
     user: User;
     showEmail?: boolean;
+    /** The account's role under the name, so staff see which desk they are on. */
+    showRole?: boolean;
 }) {
     const getInitials = useInitials();
 
@@ -24,6 +33,11 @@ export function UserInfo({
                 {showEmail && (
                     <span className="truncate text-xs text-muted-foreground">
                         {user.email}
+                    </span>
+                )}
+                {showRole && !showEmail && (
+                    <span className="truncate text-xs text-muted-foreground">
+                        {roleLabel[user.role]}
                     </span>
                 )}
             </div>

@@ -34,7 +34,7 @@ export type Transition = {
     group: RoomStatusGroup;
 };
 
-const actionLabel: Partial<Record<RoomStatus, string>> = {
+export const actionLabel: Partial<Record<RoomStatus, string>> = {
     available: 'Mark as available',
     cleaning: 'Send to cleaning',
     under_maintenance: 'Set under maintenance',
@@ -95,6 +95,7 @@ export function RoomStatusPanel({
             <StatusDialog
                 room={room}
                 target={target}
+                form={RoomStatusController.form(room.id)}
                 upcomingReservations={upcomingReservations}
                 onOpenChange={(open) => !open && setTarget(null)}
             />
@@ -102,14 +103,20 @@ export function RoomStatusPanel({
     );
 }
 
-function StatusDialog({
+/**
+ * Confirms a manual status change. `form` is the route to send it to: the
+ * Admin's room page or reception's room board.
+ */
+export function StatusDialog({
     room,
     target,
+    form,
     upcomingReservations,
     onOpenChange,
 }: {
     room: RoomSummary;
     target: Transition | null;
+    form: ReturnType<typeof RoomStatusController.form>;
     upcomingReservations: number;
     onOpenChange: (open: boolean) => void;
 }) {
@@ -133,7 +140,7 @@ function StatusDialog({
 
                         <Form
                             key={target.value}
-                            {...RoomStatusController.form(room.id)}
+                            {...form}
                             options={{ preserveScroll: true }}
                             onSuccess={() => onOpenChange(false)}
                             className="space-y-4"

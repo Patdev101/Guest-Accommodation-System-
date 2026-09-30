@@ -21,6 +21,8 @@ class SettingsTest extends TestCase
             'no_show_grace_minutes' => 60,
             'checkout_reminder_minutes' => 60,
             'no_show_refund' => 'full',
+            'standard_check_in_time' => '14:00',
+            'standard_check_out_time' => '12:00',
             ...$overrides,
         ];
     }
@@ -91,6 +93,22 @@ class SettingsTest extends TestCase
         $this->actingAs(User::factory()->admin()->create())
             ->put(route('admin.settings.update'), $this->valid(['cleaning_buffer_minutes' => -5, 'no_show_grace_minutes' => 2000]))
             ->assertSessionHasErrors(['cleaning_buffer_minutes', 'no_show_grace_minutes']);
+    }
+
+    public function test_admin_sets_standard_check_in_and_check_out_times()
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->put(route('admin.settings.update'), $this->valid(['standard_check_in_time' => '15:30', 'standard_check_out_time' => '11:00']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('15:30', Setting::get('standard_check_in_time'));
+        $this->assertSame('11:00', Setting::get('standard_check_out_time'));
+
+        $this->actingAs($admin)
+            ->put(route('admin.settings.update'), $this->valid(['standard_check_in_time' => '2pm', 'standard_check_out_time' => '']))
+            ->assertSessionHasErrors(['standard_check_in_time', 'standard_check_out_time']);
     }
 
     public function test_admin_manages_rate_units()

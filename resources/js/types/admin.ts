@@ -28,7 +28,30 @@ export type RoomSummary = {
     status: RoomStatus;
     status_label: string;
     group: RoomStatusGroup;
+    cover_url: string | null;
 };
+
+/** Who is in a room now, and who should arrive in it by the end of today. */
+export type RoomOccupancy = {
+    stay: {
+        id: number;
+        guest: string;
+        pax: number;
+        due_out_at: string;
+        overdue: boolean;
+        not_extending: boolean;
+    } | null;
+    arrival: {
+        reservation_id: number;
+        guest: string;
+        pax: number;
+        starts_at: string;
+        /** Past the grace period and still not checked in. */
+        late: boolean;
+    } | null;
+};
+
+export type BoardRoomSummary = RoomSummary & Partial<RoomOccupancy>;
 
 export type LocationOption = {
     id: number;

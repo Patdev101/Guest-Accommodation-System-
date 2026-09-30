@@ -113,6 +113,11 @@ return [
             'prefix_indexes' => true,
             // 'encrypt' => env('DB_ENCRYPT', 'yes'),
             'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+            // Return integer columns (ids, counts) as numbers, not text, as the
+            // tests' SQLite does. Without it "3" === 3 checks fail on SQL Server.
+            'options' => defined('PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE')
+                ? [constant('PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE') => true]
+                : [],
         ],
 
     ],

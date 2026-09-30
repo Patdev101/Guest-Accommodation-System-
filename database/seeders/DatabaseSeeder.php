@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\Role;
+use App\Models\IdType;
 use App\Models\RateUnit;
 use App\Models\Setting;
 use App\Models\User;
@@ -11,8 +12,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 /**
- * Seeds only what the system needs to start: the default rate units, the
- * default settings and the first Admin. Locations, rooms and rates are
+ * Seeds only what the system needs to start: the default rate units, ID
+ * types and settings, and the first Admin. Locations, rooms and rates are
  * entered by the Admin (requirements section 2). Safe to run more than once.
  */
 class DatabaseSeeder extends Seeder
@@ -23,6 +24,10 @@ class DatabaseSeeder extends Seeder
     {
         foreach (RateUnit::DEFAULTS as $name) {
             RateUnit::firstOrCreate(['name' => $name]);
+        }
+
+        foreach (IdType::DEFAULTS as $name) {
+            IdType::firstOrCreate(['name' => $name]);
         }
 
         foreach (Setting::DEFAULTS as $key => $value) {
