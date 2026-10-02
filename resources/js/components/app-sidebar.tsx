@@ -46,7 +46,8 @@ const sections: NavSection[] = [
     },
     {
         label: 'Front desk',
-        roles: ['reception', 'admin'],
+        // Hidden from admins for now (owner, 2 Oct 2026); add 'admin' back to show it.
+        roles: ['reception'],
         items: [
             {
                 title: 'Reservations',
