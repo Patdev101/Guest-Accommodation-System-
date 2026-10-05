@@ -2,26 +2,29 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Enums\Role;
+use App\Http\Controllers\Auth\SetPasswordController;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 /**
  * Admin-managed accounts. Guests can self-register; Reception and Admin
  * accounts can only be created here. Accounts are deactivated, never deleted.
+ * The Admin never sets a password: owners choose their own from an emailed link.
  */
 class UserController extends Controller
 {
-    use PasswordValidationRules, ProfileValidationRules;
+    use ProfileValidationRules;
 
     public function index(Request $request): Response
     {
@@ -38,6 +41,7 @@ class UserController extends Controller
                     'role' => $user->role->value,
                     'contact_number' => $user->contact_number,
                     'is_active' => $user->isActive(),
+                    'awaits_password' => $user->awaitsPassword(),
                     'is_self' => $user->is($request->user()),
                     'is_last_admin' => $user->isLastActiveAdmin(),
                 ]),
@@ -53,11 +57,13 @@ class UserController extends Controller
         $validated = $request->validate([
             ...$this->profileRules(),
             'contact_number' => ['nullable', ...array_slice($this->contactNumberRules(), 1)],
-            'role' => ['required', Rule::enum(Role::class)],
-            'password' => $this->passwordRules(),
+            // Guests register themselves; only staff accounts are created here.
+            'role' => ['required', Rule::enum(Role::class)->only([Role::Reception, Role::Admin])],
         ]);
 
-        $user = User::create($validated);
+        // The Admin never chooses or sees the password: the account starts with a
+        // random one nobody knows, and its owner sets their own from the emailed link.
+        $user = User::create([...$validated, 'password' => Str::random(40), 'password_set_at' => null]);
 
         if ($user->role === Role::Guest) {
             $user->guest()->create([
@@ -66,15 +72,32 @@ class UserController extends Controller
             ]);
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Account created.')]);
+        $sent = $this->emailSetupLink($user);
+
+        Inertia::flash('toast', $sent
+            ? ['type' => 'success', 'message' => __('Account created. A link to set the password was emailed to :email.', ['email' => $user->email])]
+            : ['type' => 'error', 'message' => __('Account created, but the email could not be sent. Use the key button to send the link again.')]);
 
         return to_route('admin.users.index');
+    }
+
+    /** Send the "set up your password" email; false when the mail server refuses. */
+    private function emailSetupLink(User $user): bool
+    {
+        try {
+            return SetPasswordController::sendLink($user) === Password::RESET_LINK_SENT;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return false;
+        }
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
         $validated = $request->validate([
-            'role' => ['required', Rule::enum(Role::class)],
+            // An account cannot be turned into a guest account from here.
+            'role' => ['required', Rule::enum(Role::class)->except($user->role === Role::Guest ? [] : [Role::Guest])],
         ]);
 
         // Never let an Admin remove their own access; another Admin must do it.
@@ -93,27 +116,23 @@ class UserController extends Controller
         return to_route('admin.users.index');
     }
 
-    /** The Admin types a new password for someone, e.g. a new receptionist. */
-    public function password(Request $request, User $user): RedirectResponse
-    {
-        $validated = $request->validate([
-            'password' => $this->passwordRules(),
-        ]);
-
-        $user->update(['password' => $validated['password']]);
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('New password set for :name.', ['name' => $user->name])]);
-
-        return to_route('admin.users.index');
-    }
-
-    /** Email the person a link to choose their own new password. */
+    /**
+     * Email the person a link to choose their own password. Two separate emails:
+     * "set up your password" for an account that never had one, and the normal
+     * "reset password" for someone who forgot theirs. The Admin never sets it.
+     */
     public function sendResetLink(User $user): RedirectResponse
     {
-        $status = Password::sendResetLink(['email' => $user->email]);
+        if ($user->awaitsPassword()) {
+            $status = SetPasswordController::sendLink($user);
+            $message = __('Setup link emailed to :email.', ['email' => $user->email]);
+        } else {
+            $status = Password::sendResetLink(['email' => $user->email]);
+            $message = __('Password reset link emailed to :email.', ['email' => $user->email]);
+        }
 
         Inertia::flash('toast', $status === Password::RESET_LINK_SENT
-            ? ['type' => 'success', 'message' => __('Password reset link emailed to :email.', ['email' => $user->email])]
+            ? ['type' => 'success', 'message' => $message]
             : ['type' => 'error', 'message' => __($status)]);
 
         return to_route('admin.users.index');

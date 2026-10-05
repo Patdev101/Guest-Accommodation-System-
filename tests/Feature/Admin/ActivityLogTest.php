@@ -69,10 +69,8 @@ class ActivityLogTest extends TestCase
     {
         $desk = User::factory()->reception()->create();
 
-        $this->actingAs(User::factory()->admin()->create())->put(route('admin.users.password', $desk), [
-            'password' => 'new-secret-123',
-            'password_confirmation' => 'new-secret-123',
-        ]);
+        $this->actingAs($desk);
+        $desk->update(['password' => 'new-secret-123']);
 
         $entry = ActivityLog::query()->where('subject_type', 'User')->where('action', 'updated')->sole();
         $this->assertSame(['password' => ['(hidden)', '(changed)']], $entry->changes);

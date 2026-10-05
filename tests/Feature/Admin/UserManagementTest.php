@@ -69,6 +69,22 @@ class UserManagementTest extends TestCase
         $this->assertSame(Role::Reception, $guest->refresh()->role);
     }
 
+    public function test_only_staff_accounts_are_created_or_assigned_here()
+    {
+        $admin = User::factory()->admin()->create();
+        $desk = User::factory()->reception()->create();
+
+        $this->actingAs($admin)
+            ->post(route('admin.users.store'), ['name' => 'A Guest', 'email' => 'g@example.com', 'role' => 'guest'])
+            ->assertSessionHasErrors('role');
+        $this->assertDatabaseMissing('users', ['email' => 'g@example.com']);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.users.update', $desk), ['role' => 'guest'])
+            ->assertSessionHasErrors('role');
+        $this->assertSame(Role::Reception, $desk->refresh()->role);
+    }
+
     public function test_admin_cannot_remove_their_own_admin_role()
     {
         $admin = User::factory()->admin()->create();

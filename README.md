@@ -70,7 +70,7 @@ Reservations are mainly **Reception's** job (walk-ins, managing all bookings, ca
 
 Verification at handoff:
 
-- **PHP tests:** 164 passing, 3 skipped (30 Sep 2026). The skipped ones are the starter kit's two-factor tests; two-factor login is switched off.
+- **PHP tests:** 166 passing, 3 skipped (30 Sep 2026). The skipped ones are the starter kit's two-factor tests; two-factor login is switched off.
 - **Static checks:** PHPStan, Pint, ESLint/format and TypeScript are all clean. The production build succeeds.
 - **SQL Server:** tested live against SQL Server Express. All admin pages load in about 0.2 to 0.4 seconds. Alerts checked live on 30 Sep 2026: `php artisan front-desk:alerts` sent the check-out calls for the two sample stays, and the bell listed them and marked them read.
 - **Email:** the "Send me a test email" button delivers to Mailpit (checked 30 Sep 2026).
@@ -202,9 +202,11 @@ These combine the requirements document with the owner's decisions of 29 Sep 202
 ### Accounts and audit (built 30 Sep 2026)
 
 - **Role changes** on the Users page ask for confirmation first.
-- **Password reset by an Admin:**
-    - **Email a reset link:** valid 60 minutes; uses the normal "Forgot password" flow.
-    - **Set new password:** the Admin types it and tells the person.
+- **Passwords (changed 5 Oct 2026, owner's decision): the Admin never sets or sees anyone's password.** There are two separate flows:
+    - **Set up a password (new accounts):** the New account dialog has no password boxes. Creating the account emails a **"Set up your account"** link (AccountSetup notification → /set-password/{token}, page uth/set-password, Auth\SetPasswordController). It works for **3 days** (password broker invites in config/auth.php). Until it is used, users.password_set_at is null and the Users page shows **Awaiting password setup**; the key button re-sends the setup link.
+    - **Forgot password (existing accounts):** the normal Fortify reset (/forgot-password → /reset-password/{token}), valid 60 minutes. The key button sends this once a password has been set.
+    - The old "Set new password" by the Admin (dmin.users.password) was removed.
+    - Emails need the mail server running (Mailpit locally). If sending fails, the account is still created and the Admin is told to send the link again.
 - **Accounts are deactivated, never deleted,** from the Users page (with confirmation), so their names stay on records.
     - A deactivated account cannot log in ("This account has been deactivated…").
     - Someone deactivated while logged in is signed out on their next click.

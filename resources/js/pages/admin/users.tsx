@@ -7,7 +7,6 @@ import { FormField } from '@/components/form-field';
 import { IconButton } from '@/components/icon-button';
 import InputError from '@/components/input-error';
 import { Page, PageHeader } from '@/components/page';
-import PasswordInput from '@/components/password-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -28,7 +27,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import {
     Table,
@@ -49,6 +47,7 @@ type Account = {
     role: Role;
     contact_number: string | null;
     is_active: boolean;
+    awaits_password: boolean;
     is_self: boolean;
     is_last_admin: boolean;
 };
@@ -85,7 +84,7 @@ export default function Users({ users, roles }: Props) {
             <Page>
                 <PageHeader
                     title="Users"
-                    description="Guests register themselves. Reception and Admin accounts are created here. Accounts are deactivated, never deleted, so records keep their names."
+                    description="Create Reception and Admin accounts here. Each person sets their own password from an emailed link."
                     actions={
                         <Button onClick={() => setCreating(true)}>
                             <UserPlus />
@@ -158,23 +157,36 @@ export default function Users({ users, roles }: Props) {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {roles.map((role) => (
-                                                    <SelectItem
-                                                        key={role.value}
-                                                        value={role.value}
-                                                    >
-                                                        {role.label}
-                                                    </SelectItem>
-                                                ))}
+                                                {roles
+                                                    .filter(
+                                                        (role) =>
+                                                            role.value !==
+                                                                'guest' ||
+                                                            user.role ===
+                                                                'guest',
+                                                    )
+                                                    .map((role) => (
+                                                        <SelectItem
+                                                            key={role.value}
+                                                            value={role.value}
+                                                        >
+                                                            {role.label}
+                                                        </SelectItem>
+                                                    ))}
                                             </SelectContent>
                                         </Select>
                                     </TableCell>
                                     <TableCell>
-                                        {user.is_active ? (
+                                        {!user.is_active ? null : user.awaits_password ? (
+                                            <Badge variant="outline">
+                                                Awaiting password setup
+                                            </Badge>
+                                        ) : (
                                             <Badge variant="secondary">
                                                 Active
                                             </Badge>
-                                        ) : (
+                                        )}
+                                        {user.is_active ? null : (
                                             <Badge variant="outline">
                                                 Deactivated
                                             </Badge>
@@ -182,7 +194,11 @@ export default function Users({ users, roles }: Props) {
                                     </TableCell>
                                     <TableCell className="pr-4 text-right whitespace-nowrap">
                                         <IconButton
-                                            label={`Reset password for ${user.name}`}
+                                            label={
+                                                user.awaits_password
+                                                    ? `Send the setup link to ${user.name} again`
+                                                    : `Send ${user.name} a password reset link`
+                                            }
                                             onClick={() => setResetting(user)}
                                             disabled={!user.is_active}
                                             disabledReason="Reactivate the account first"
@@ -229,7 +245,7 @@ export default function Users({ users, roles }: Props) {
             <NewAccountDialog
                 open={creating}
                 onOpenChange={setCreating}
-                roles={roles}
+                roles={roles.filter((role) => role.value !== 'guest')}
             />
 
             {roleChange && (
@@ -280,7 +296,11 @@ export default function Users({ users, roles }: Props) {
     );
 }
 
-/** Two ways to help someone who forgot their password. */
+/**
+ * Email a password link. Two different emails: a setup link for an account
+ * that never had a password, a reset link for someone who forgot theirs.
+ * The Admin never types anyone's password.
+ */
 function ResetPasswordDialog({
     user,
     onClose,
@@ -295,105 +315,50 @@ function ResetPasswordDialog({
         >
             <DialogContent>
                 {user && (
-                    <>
-                        <DialogHeader>
-                            <DialogTitle>
-                                Reset password for {user.name}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Email them a link to choose a new password, or
-                                set one yourself and tell them in person.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <Form
-                            {...UserController.sendResetLink.form(user.id)}
-                            options={{ preserveScroll: true }}
-                            onSuccess={onClose}
-                        >
-                            {({ processing }) => (
-                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-                                    <div className="min-w-0 text-sm">
-                                        <p className="font-medium">
-                                            Email a reset link
-                                        </p>
-                                        <p className="truncate text-muted-foreground">
-                                            Sent to {user.email}
-                                        </p>
-                                    </div>
-                                    <Button
-                                        type="submit"
-                                        variant="outline"
-                                        disabled={processing}
-                                    >
-                                        {processing ? <Spinner /> : <Mail />}
-                                        Send link
-                                    </Button>
-                                </div>
-                            )}
-                        </Form>
-
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <Separator className="flex-1" />
-                            or
-                            <Separator className="flex-1" />
-                        </div>
-
-                        <Form
-                            {...UserController.password.form(user.id)}
-                            options={{ preserveScroll: true }}
-                            onSuccess={onClose}
-                            resetOnSuccess
-                            className="space-y-4"
-                        >
-                            {({ errors, processing }) => (
-                                <>
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <FormField
-                                            label="New password"
-                                            htmlFor="reset-password"
-                                            error={errors.password}
-                                        >
-                                            <PasswordInput
-                                                id="reset-password"
-                                                name="password"
-                                                autoComplete="new-password"
-                                                required
-                                            />
-                                        </FormField>
-                                        <FormField
-                                            label="Confirm password"
-                                            htmlFor="reset-password-confirmation"
-                                        >
-                                            <PasswordInput
-                                                id="reset-password-confirmation"
-                                                name="password_confirmation"
-                                                autoComplete="new-password"
-                                                required
-                                            />
-                                        </FormField>
-                                    </div>
-                                    <DialogFooter>
-                                        <DialogClose asChild>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </DialogClose>
-                                        <Button
-                                            type="submit"
-                                            disabled={processing}
-                                        >
-                                            {processing && <Spinner />}
-                                            Set new password
+                    <Form
+                        {...UserController.sendResetLink.form(user.id)}
+                        options={{ preserveScroll: true }}
+                        onSuccess={onClose}
+                        className="space-y-4"
+                    >
+                        {({ processing }) => (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        {user.awaits_password
+                                            ? `Send the setup link to ${user.name} again?`
+                                            : `Send ${user.name} a password reset link?`}
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        {user.awaits_password
+                                            ? 'They have not set a password yet. The new link replaces the old one and works for 3 days.'
+                                            : 'For someone who forgot their password. They choose a new one themselves; the link works for 60 minutes.'}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <p className="truncate rounded-lg border px-3 py-2.5 text-sm">
+                                    <span className="text-muted-foreground">
+                                        Sent to{' '}
+                                    </span>
+                                    <span className="font-medium">
+                                        {user.email}
+                                    </span>
+                                </p>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline">
+                                            Cancel
                                         </Button>
-                                    </DialogFooter>
-                                </>
-                            )}
-                        </Form>
-                    </>
+                                    </DialogClose>
+                                    <Button type="submit" disabled={processing}>
+                                        {processing ? <Spinner /> : <Mail />}
+                                        {user.awaits_password
+                                            ? 'Send setup link'
+                                            : 'Send reset link'}
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        )}
+                    </Form>
                 )}
             </DialogContent>
         </Dialog>
@@ -415,8 +380,8 @@ function NewAccountDialog({
                 <DialogHeader>
                     <DialogTitle>New account</DialogTitle>
                     <DialogDescription>
-                        Share the password with the person directly. They can
-                        change it under Settings.
+                        The person sets their own password from a link sent to
+                        their email. Check the email address carefully.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -480,31 +445,11 @@ function NewAccountDialog({
                                     type="tel"
                                 />
                             </FormField>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <FormField
-                                    label="Password"
-                                    htmlFor="password"
-                                    error={errors.password}
-                                >
-                                    <PasswordInput
-                                        id="password"
-                                        name="password"
-                                        autoComplete="new-password"
-                                        required
-                                    />
-                                </FormField>
-                                <FormField
-                                    label="Confirm password"
-                                    htmlFor="password_confirmation"
-                                >
-                                    <PasswordInput
-                                        id="password_confirmation"
-                                        name="password_confirmation"
-                                        autoComplete="new-password"
-                                        required
-                                    />
-                                </FormField>
-                            </div>
+                            <p className="flex gap-2 rounded-lg bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+                                <Mail className="mt-0.5 size-4 shrink-0" />
+                                No password is set here. We email this person a
+                                link to choose their own. It works for 3 days.
+                            </p>
                             <DialogFooter>
                                 <DialogClose asChild>
                                     <Button type="button" variant="outline">
@@ -513,7 +458,7 @@ function NewAccountDialog({
                                 </DialogClose>
                                 <Button type="submit" disabled={processing}>
                                     {processing && <Spinner />}
-                                    Create account
+                                    Create account and email link
                                 </Button>
                             </DialogFooter>
                         </>

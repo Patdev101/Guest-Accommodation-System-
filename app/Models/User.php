@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\LogsActivity;
 use App\Enums\Role;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -24,15 +25,29 @@ use Illuminate\Support\Carbon;
  * @property string $password
  * @property string|null $remember_token
  * @property Carbon|null $deactivated_at
+ * @property CarbonImmutable|null $password_set_at Null while an Admin-created account waits for its owner to set a password
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'role', 'contact_number', 'deactivated_at'])]
+#[Fillable(['name', 'email', 'password', 'role', 'contact_number', 'deactivated_at', 'password_set_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, LogsActivity, Notifiable;
+
+    protected static function booted(): void
+    {
+        // password_set_at stays null only for accounts an Admin creates (they pass null
+        // on purpose); it is filled when the owner chooses a password.
+        static::saving(function (User $user) {
+            $given = array_key_exists('password_set_at', $user->getAttributes());
+
+            if ((! $user->exists && ! $given) || ($user->exists && $user->isDirty('password') && $user->password_set_at === null)) {
+                $user->password_set_at = now();
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -46,6 +61,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => Role::class,
             'deactivated_at' => 'datetime',
+            'password_set_at' => 'datetime',
         ];
     }
 
@@ -72,6 +88,12 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->hasRole(Role::Reception, Role::Admin);
+    }
+
+    /** Created by an Admin and not yet set up by its owner. */
+    public function awaitsPassword(): bool
+    {
+        return $this->password_set_at === null;
     }
 
     public function isActive(): bool

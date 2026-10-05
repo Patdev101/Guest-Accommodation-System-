@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\RoomRateController;
 use App\Http\Controllers\Admin\RoomStatusController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\SetPasswordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Reception\AlertController;
 use App\Http\Controllers\Reception\CalendarController;
@@ -33,6 +34,14 @@ use Illuminate\Support\Facades\Route;
 // Admin-only phase: the home address goes straight to the dashboard (or the
 // login page). It becomes the public, Airbnb-style room browsing page later.
 Route::get('/', fn () => auth()->check() ? to_route('dashboard') : to_route('login'))->name('home');
+
+// First-time password setup from the emailed link (accounts an Admin created).
+Route::middleware('guest')->group(function () {
+    Route::get('set-password/{token}', [SetPasswordController::class, 'create'])->name('password.setup');
+    Route::post('set-password', [SetPasswordController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('password.setup.store');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -104,7 +113,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::patch('users/{user}', [UserController::class, 'update'])->name('users.update');
-        Route::put('users/{user}/password', [UserController::class, 'password'])->name('users.password');
         Route::post('users/{user}/password-reset-link', [UserController::class, 'sendResetLink'])
             ->middleware('throttle:6,1')
             ->name('users.reset-link');

@@ -168,3 +168,9 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Edge adds its own show-password eye; hide it so only the app's toggle shows. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+    display: none;
+}

@@ -20,7 +20,7 @@ trait LogsActivity
      *
      * @var list<string>
      */
-    protected static array $activityHidden = ['password', 'remember_token', 'created_at', 'updated_at'];
+    protected static array $activityHidden = ['password', 'password_set_at', 'remember_token', 'created_at', 'updated_at'];
 
     public static function bootLogsActivity(): void
     {

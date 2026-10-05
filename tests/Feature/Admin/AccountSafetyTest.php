@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Enums\Role;
 use App\Models\User;
+use App\Notifications\AccountSetup;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -15,18 +16,90 @@ class AccountSafetyTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_sets_a_new_password_for_someone()
+    public function test_a_new_account_gets_a_setup_link_and_its_owner_sets_the_password()
+    {
+        Notification::fake();
+
+        // The Admin cannot choose the password, even by sending one.
+        $this->actingAs(User::factory()->admin()->create())
+            ->post(route('admin.users.store'), [
+                'name' => 'Front Desk',
+                'email' => 'desk@example.com',
+                'role' => 'reception',
+                'password' => 'admin-chosen-1',
+                'password_confirmation' => 'admin-chosen-1',
+            ])
+            ->assertRedirect(route('admin.users.index'));
+
+        $desk = User::where('email', 'desk@example.com')->firstOrFail();
+        $this->assertTrue($desk->awaitsPassword());
+        $this->assertFalse(Hash::check('admin-chosen-1', $desk->password));
+
+        // A setup email, not the "forgot password" one.
+        Notification::assertNotSentTo($desk, ResetPassword::class);
+        $token = null;
+        Notification::assertSentTo($desk, AccountSetup::class, function (AccountSetup $mail) use ($desk, &$token) {
+            $token = $mail->token;
+
+            return str_contains((string) $mail->toMail($desk)->actionUrl, '/set-password/'.$mail->token);
+        });
+
+        Auth::logout();
+
+        $this->get(route('password.setup', ['token' => $token, 'email' => $desk->email]))->assertOk();
+
+        $this->post(route('password.setup.store'), [
+            'token' => 'wrong-token',
+            'email' => $desk->email,
+            'password' => 'my-own-secret-1',
+            'password_confirmation' => 'my-own-secret-1',
+        ])->assertSessionHasErrors('email');
+
+        $this->post(route('password.setup.store'), [
+            'token' => $token,
+            'email' => $desk->email,
+            'password' => 'my-own-secret-1',
+            'password_confirmation' => 'my-own-secret-1',
+        ])->assertRedirect(route('login'));
+
+        $desk->refresh();
+        $this->assertFalse($desk->awaitsPassword());
+        $this->assertTrue(Hash::check('my-own-secret-1', $desk->password));
+
+        // The link works once.
+        $this->post(route('password.setup.store'), [
+            'token' => $token,
+            'email' => $desk->email,
+            'password' => 'another-secret-2',
+            'password_confirmation' => 'another-secret-2',
+        ])->assertSessionHasErrors('email');
+    }
+
+    public function test_the_key_button_sends_the_setup_link_until_a_password_is_set()
+    {
+        Notification::fake();
+        $invited = User::factory()->reception()->create(['password_set_at' => null]);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->post(route('admin.users.reset-link', $invited))
+            ->assertRedirect(route('admin.users.index'));
+
+        Notification::assertSentTo($invited, AccountSetup::class);
+        Notification::assertNotSentTo($invited, ResetPassword::class);
+    }
+
+    public function test_the_admin_can_no_longer_set_someones_password()
     {
         $desk = User::factory()->reception()->create();
 
         $this->actingAs(User::factory()->admin()->create())
-            ->put(route('admin.users.password', $desk), [
+            ->put('/admin/users/'.$desk->id.'/password', [
                 'password' => 'new-secret-123',
                 'password_confirmation' => 'new-secret-123',
             ])
-            ->assertRedirect(route('admin.users.index'));
+            ->assertNotFound();
 
-        $this->assertTrue(Hash::check('new-secret-123', $desk->refresh()->password));
+        $this->assertFalse(Hash::check('new-secret-123', $desk->refresh()->password));
     }
 
     public function test_admin_emails_a_password_reset_link()
