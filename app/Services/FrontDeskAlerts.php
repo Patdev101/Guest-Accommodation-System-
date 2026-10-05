@@ -164,6 +164,23 @@ class FrontDeskAlerts
         ), $by);
     }
 
+    /** Rule 27: a booking's dates, rooms or contact were changed. */
+    public function changed(Reservation $reservation, ?User $by): void
+    {
+        $reservation->load(['guest:id,name', 'rooms.room:id,name']);
+
+        $this->toDesk(new FrontDeskAlert(
+            'changed',
+            __('Booking changed: :name', ['name' => $reservation->guest->name]),
+            __('Now :rooms · :guests · arrives :time.', [
+                'rooms' => $this->roomNames($reservation->rooms),
+                'guests' => $this->guests((int) $reservation->rooms->sum('pax')),
+                'time' => $reservation->starts_at->format('j M g:i A'),
+            ]),
+            route('reception.reservations.show', $reservation),
+        ), $by);
+    }
+
     /** Rule 27: a booking was cancelled or marked as a no-show; its rooms are free again. */
     public function cancelled(Reservation $reservation, bool $noShow, ?User $by): void
     {

@@ -52,6 +52,7 @@ const kinds: Record<string, { icon: LucideIcon; tone: Tone }> = {
     extension_waiting: { icon: ArrowRightLeft, tone: 'act' },
     arriving: { icon: CalendarClock, tone: 'info' },
     booked: { icon: BookmarkPlus, tone: 'info' },
+    changed: { icon: CalendarClock, tone: 'info' },
     room_ready: { icon: CheckCircle2, tone: 'done' },
     extension: { icon: CalendarPlus, tone: 'done' },
     cancelled: { icon: CalendarX, tone: 'quiet' },

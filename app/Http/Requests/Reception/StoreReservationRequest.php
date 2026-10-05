@@ -6,6 +6,7 @@ use App\Concerns\ProfileValidationRules;
 use App\Enums\BilledTo;
 use App\Enums\GuestType;
 use App\Models\Payment;
+use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\RoomRate;
 use Carbon\CarbonImmutable;
@@ -39,7 +40,8 @@ class StoreReservationRequest extends FormRequest
             'purpose' => ['nullable', 'string', 'max:255'],
             'guest_type' => ['required', Rule::enum(GuestType::class)],
 
-            'starts_at' => ['required', 'date_format:'.self::DATE_FORMAT, 'after_or_equal:today'],
+            // When editing, an arrival that is left as it was may be in the past (a late guest).
+            'starts_at' => ['required', 'date_format:'.self::DATE_FORMAT, ...($this->keepsArrival() ? [] : ['after_or_equal:today'])],
             'ends_at' => ['required', 'date_format:'.self::DATE_FORMAT, 'after:starts_at'],
 
             'rooms' => ['required', 'array', 'min:1', 'max:50'],
@@ -47,6 +49,8 @@ class StoreReservationRequest extends FormRequest
             'rooms.*.room_rate_id' => ['required', 'integer'],
             'rooms.*.pax' => ['required', 'integer', 'min:1', 'max:1000'],
             'rooms.*.price' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            // Everyone in the booking. The rooms together must have a place for each of them.
+            'guests' => ['nullable', 'integer', 'min:1', 'max:1000'],
 
             'payment_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
             'payment_method' => ['nullable', Rule::in(Payment::METHODS)],
@@ -111,6 +115,17 @@ class StoreReservationRequest extends FormRequest
 
                 $rooms = Room::query()->whereKey(array_column($this->roomLines(), 'room_id'))->get()->keyBy('id');
 
+                // Refuse a booking that leaves guests without a room (the page suggests rooms to add).
+                $placed = array_sum(array_column($this->roomLines(), 'pax'));
+
+                if ($this->filled('guests') && $placed < $this->integer('guests')) {
+                    $validator->errors()->add('rooms', trans_choice(
+                        '{1} The rooms have places for :placed, but the booking is for :guests guests: 1 guest has no room. Add another room.|[2,*] The rooms have places for :placed, but the booking is for :guests guests: :count guests have no room. Add another room.',
+                        $this->integer('guests') - $placed,
+                        ['placed' => $placed, 'guests' => $this->integer('guests')],
+                    ));
+                }
+
                 foreach ($this->roomLines() as $index => $line) {
                     $room = $rooms[$line['room_id']];
 
@@ -130,6 +145,15 @@ class StoreReservationRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    /** Editing a reservation without changing its arrival time. */
+    private function keepsArrival(): bool
+    {
+        $reservation = $this->route('reservation');
+
+        return $reservation instanceof Reservation
+            && $reservation->starts_at->format(self::DATE_FORMAT) === $this->input('starts_at');
     }
 
     /**

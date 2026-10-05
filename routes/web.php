@@ -48,7 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Front desk: Reception, and the Admin, who can do everything Reception can.
     Route::middleware('role:reception,admin')->prefix('reception')->name('reception.')->group(function () {
-        Route::resource('reservations', ReservationController::class)->only(['index', 'create', 'store', 'show']);
+        Route::resource('reservations', ReservationController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::patch('reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
         Route::patch('reservations/{reservation}/no-show', [ReservationController::class, 'markNoShow'])->name('reservations.no-show');
         Route::post('reservations/{reservation}/payments', [ReservationPaymentController::class, 'store'])->name('reservations.payments.store');

@@ -70,7 +70,7 @@ Reservations are mainly **Reception's** job (walk-ins, managing all bookings, ca
 
 Verification at handoff:
 
-- **PHP tests:** 166 passing, 3 skipped (30 Sep 2026). The skipped ones are the starter kit's two-factor tests; two-factor login is switched off.
+- **PHP tests:** 169 passing, 3 skipped (30 Sep 2026). The skipped ones are the starter kit's two-factor tests; two-factor login is switched off.
 - **Static checks:** PHPStan, Pint, ESLint/format and TypeScript are all clean. The production build succeeds.
 - **SQL Server:** tested live against SQL Server Express. All admin pages load in about 0.2 to 0.4 seconds. Alerts checked live on 30 Sep 2026: `php artisan front-desk:alerts` sent the check-out calls for the two sample stays, and the bell listed them and marked them read.
 - **Email:** the "Send me a test email" button delivers to Mailpit (checked 30 Sep 2026).
@@ -272,6 +272,7 @@ These combine the requirements document with the owner's decisions of 29 Sep 202
     - Reception books walk-ins on the guest's behalf (no guest account needed).
 11. The system shows the earliest available slot and an availability calendar; the guest takes the earliest slot or picks an open slot. **Built for reception:** when the free rooms cannot hold the number of guests, the booking page shows the earliest time when enough rooms are free for the whole group, with a "Use these dates" button. (The calendar is not built yet.)
 12. Every room in a reservation records its **pax**, which must be ≤ that room's pax capacity.
+    - **Everyone needs a place (built 5 Oct 2026):** the booking page asks for the number of guests. If the rooms added have fewer places (e.g. 10 guests, one room for 8), **the booking is refused**: a red message says how many guests have no room and **suggests free rooms to add** (the smallest room that takes the rest, otherwise the biggest rooms first), with an **Add suggested room** button; Save stays disabled. The server checks the same (`guests` in `StoreReservationRequest`). This covers walk-ins too, since they use the same page.
 
 **Built at the front desk (30 Sep 2026):**
 
@@ -649,7 +650,7 @@ Front-desk route names (prefix `reception`, middleware `role:reception,admin`): 
 - **Speed (29 Sep 2026):** hover prefetch on sidebar links was removed (the single-request dev server queued prefetches ahead of clicks); sessions and cache use files instead of SQL Server; SSR is off in development.
 - **Account deletion:** "Delete account" in profile settings still exists for everyone (the last active Admin is blocked). Staff should be **deactivated** by an Admin instead. Guests may delete their own account; revisit this in Phase 3, when guests have reservations linked to them.
 - **Stale project path:** `docs/` still mentions the old project folder path.
-- **Reservations cannot be edited yet** (dates, rooms or contact). For now, cancel and book again.
+- **Editing a reservation (built 5 Oct 2026):** an **Edit** button on an active reservation opens the booking page filled in (`reception.reservations.edit|update`, same page `reservations/create.tsx` with the `editing` prop). Dates, rooms, guests per room, prices and contact details can change; the booking's own rooms count as free; payments stay and are still recorded on the reservation page. Refused when a room is taken by someone else, when the new total is below what was already paid, or when a room is part of another guest's pending extension. Reception gets a "Booking changed" alert. Checked-in, cancelled and no-show reservations cannot be edited.
 - **The two sample stays** (converted to the group shape) have no reservation, so they have no room charges and no ID photo; their expected check-out has passed.
 - **Not built at the front desk:** discounts (only adding/removing extras), refunds of overpayments on a stay, billing a booked room that was not used at check-in, and alerts by SMS or email (alerts are in-app only).
 - **ID photos are personal data:** they sit in `storage/app/private/id-photos`. Include that folder in backups and delete photos when the retention period ends (to decide with the owner).
@@ -798,7 +799,7 @@ Then a layout pass from the owner's Figma mock-ups (a top-nav dashboard and a 4-
 1. **Guest side (on hold until the owner asks):** Step B (public browsing) and Step C.3 (online booking), guest cancellations, Guest B answering the move request in the app, and the guest's own in-app notifications (rule 27; reuse `notifications` with a guest-side bell).
 2. **Reports (Phase 6):** guest log, held IDs, unpaid company bills (use `charges.billed_to` and `payments.paid_by`), occupancy; print and CSV.
 3. **Admin extras** still parked: companies list, admin calendar (reuse `pages/reception/calendar.tsx`), dashboard trends.
-4. **Front-desk polish:** edit a reservation (dates, rooms, contact), printable bill, companies picker, discounts, refund method details, overpayment refunds (open questions 17 to 19).
+4. **Front-desk polish:** printable bill, companies picker, discounts, refund method details, overpayment refunds (open questions 17 to 19).
 5. **Go-live setup:** Windows Task Scheduler entry for `php artisan schedule:run` (section 5), the company's SMTP server, a real web server instead of `php artisan serve`.
 
 ---

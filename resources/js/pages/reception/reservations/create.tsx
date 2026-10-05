@@ -45,7 +45,9 @@ import { suggestPrice } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 import {
     create as reservationsCreate,
+    edit as reservationsEdit,
     index as reservationsIndex,
+    show as reservationsShow,
 } from '@/routes/reception/reservations';
 import type { LocationOption, RoomSummary } from '@/types';
 
@@ -78,6 +80,18 @@ type Props = {
     paymentMethods: string[];
     standardTimes: { check_in: string; check_out: string };
     walkIn: boolean;
+    /** The reservation being changed; null for a new booking. */
+    editing: {
+        id: number;
+        contact_name: string;
+        contact_number: string;
+        email: string | null;
+        company: string | null;
+        purpose: string | null;
+        guest_type: string;
+        paid: string;
+        rooms: Line[];
+    } | null;
 };
 
 type Line = {
@@ -122,6 +136,38 @@ function splitValue(value: string): [string, string] {
     return [date, time];
 }
 
+/**
+ * Free rooms that give `need` more guests a place: the smallest room that
+ * takes them all, otherwise the biggest rooms first. Null = not enough rooms.
+ */
+function suggestRooms(
+    need: number,
+    candidates: RoomOption[],
+): RoomOption[] | null {
+    const picked: RoomOption[] = [];
+    let pool = [...candidates];
+    let left = need;
+
+    while (left > 0) {
+        const fits = pool
+            .filter((room) => room.pax_capacity >= left)
+            .sort((a, b) => a.pax_capacity - b.pax_capacity)[0];
+        const next =
+            fits ??
+            [...pool].sort((a, b) => b.pax_capacity - a.pax_capacity)[0];
+
+        if (!next) {
+            return null;
+        }
+
+        picked.push(next);
+        pool = pool.filter((room) => room.id !== next.id);
+        left -= next.pax_capacity;
+    }
+
+    return picked;
+}
+
 function addDays(date: string, days: number): string {
     const [year, month, day] = date.split('-').map(Number);
     const next = new Date(Date.UTC(year, month - 1, day + days));
@@ -139,17 +185,18 @@ export default function NewReservation({
     paymentMethods,
     standardTimes,
     walkIn,
+    editing,
 }: Props) {
     const form = useForm<BookingForm>({
-        contact_name: '',
-        contact_number: '',
-        email: '',
-        company: '',
-        purpose: '',
-        guest_type: guestTypes[0]?.value ?? 'visitor',
+        contact_name: editing?.contact_name ?? '',
+        contact_number: editing?.contact_number ?? '',
+        email: editing?.email ?? '',
+        company: editing?.company ?? '',
+        purpose: editing?.purpose ?? '',
+        guest_type: editing?.guest_type ?? guestTypes[0]?.value ?? 'visitor',
         starts_at: window.starts_at,
         ends_at: window.ends_at,
-        rooms: [],
+        rooms: editing?.rooms ?? [],
         payment_amount: '',
         payment_method: '',
         paid_by: 'guest',
@@ -204,7 +251,9 @@ export default function NewReservation({
         }));
 
         router.get(
-            reservationsCreate().url,
+            editing
+                ? reservationsEdit(editing.id).url
+                : reservationsCreate().url,
             {
                 starts_at: startsAt,
                 ends_at: endsAt,
@@ -283,6 +332,67 @@ export default function NewReservation({
     const selected = new Set(lines.map((line) => line.room_id));
     const paying = Number(form.data.payment_amount) > 0;
 
+    // Every guest needs a place. When the rooms added cannot take the whole
+    // group, the booking is refused and free rooms that would fit are suggested.
+    const unplaced = lines.length > 0 ? Math.max(0, pax - placed) : 0;
+    const spare = lines.reduce(
+        (sum, line) =>
+            sum +
+            Math.max(
+                0,
+                (roomById(line.room_id)?.pax_capacity ?? line.pax) - line.pax,
+            ),
+        0,
+    );
+    // Still without a place even when the added rooms are filled up.
+    const needRooms = Math.max(0, unplaced - spare);
+    const suggestion =
+        needRooms > 0
+            ? suggestRooms(
+                  needRooms,
+                  rooms.filter(
+                      (room) =>
+                          room.blocked_reason === null &&
+                          !selected.has(room.id) &&
+                          room.rates.length > 0,
+                  ),
+              )
+            : [];
+
+    /** Fill the added rooms, then add the suggested ones, so everyone has a place. */
+    const applySuggestion = () => {
+        let left = unplaced;
+
+        const filled = lines.map((line) => {
+            const capacity = roomById(line.room_id)?.pax_capacity ?? line.pax;
+            const more = Math.min(left, Math.max(0, capacity - line.pax));
+            left -= more;
+
+            return { ...line, pax: line.pax + more };
+        });
+
+        const added = (suggestion ?? []).map((room) => {
+            const take = Math.max(1, Math.min(room.pax_capacity, left));
+            left -= take;
+
+            return {
+                room_id: room.id,
+                room_rate_id: room.rates[0].id,
+                pax: take,
+                price: String(
+                    suggestPrice(
+                        room.rates[0].price,
+                        room.rates[0].unit,
+                        form.data.starts_at,
+                        form.data.ends_at,
+                    ).total,
+                ),
+            };
+        });
+
+        form.setData('rooms', [...filled, ...added]);
+    };
+
     // Guests arriving today can go straight on to the check-in form.
     const arrivesToday = startDate === todayIso();
 
@@ -293,8 +403,19 @@ export default function NewReservation({
             payment_method: paying ? data.payment_method : '',
             receipt_number: paying ? data.receipt_number : '',
             check_in_now: checkInNow,
+            // The size of the group, so the server can refuse a booking that leaves guests without a room.
+            guests: pax,
         }));
-        form.post(ReservationController.store.url(), { preserveScroll: true });
+
+        if (editing) {
+            form.put(ReservationController.update.url(editing.id), {
+                preserveScroll: true,
+            });
+        } else {
+            form.post(ReservationController.store.url(), {
+                preserveScroll: true,
+            });
+        }
     };
 
     // A walk-in's main button saves and opens the check-in form.
@@ -305,14 +426,30 @@ export default function NewReservation({
 
     return (
         <>
-            <Head title={walkIn ? 'Walk-in' : 'New reservation'} />
+            <Head
+                title={
+                    editing
+                        ? `Edit reservation #${editing.id}`
+                        : walkIn
+                          ? 'Walk-in'
+                          : 'New reservation'
+                }
+            />
             <Page className="max-w-5xl">
                 <PageHeader
-                    title={walkIn ? 'Walk-in' : 'New reservation'}
+                    title={
+                        editing
+                            ? `Edit reservation #${editing.id}`
+                            : walkIn
+                              ? 'Walk-in'
+                              : 'New reservation'
+                    }
                     description={
-                        walkIn
-                            ? 'Guests who are here now: choose the rooms, save, then check them in straight away.'
-                            : `Book one or more rooms for a guest or a company. The guest list and ID are taken at check-in. Standard times: check-in ${formatClock(standardTimes.check_in)}, check-out ${formatClock(standardTimes.check_out)}.`
+                        editing
+                            ? 'Change the dates, rooms, guests per room, prices or contact details. The rooms this booking already has count as free. Payments are recorded on the reservation page.'
+                            : walkIn
+                              ? 'Guests who are here now: choose the rooms, save, then check them in straight away.'
+                              : `Book one or more rooms for a guest or a company. The guest list and ID are taken at check-in. Standard times: check-in ${formatClock(standardTimes.check_in)}, check-out ${formatClock(standardTimes.check_out)}.`
                     }
                 />
 
@@ -526,7 +663,63 @@ export default function NewReservation({
                                     them if needed.
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-4">
+                                {unplaced > 0 && (
+                                    <div
+                                        role="alert"
+                                        className="flex flex-wrap items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm dark:border-red-900 dark:bg-red-950/40"
+                                    >
+                                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-400" />
+                                        <div className="min-w-0 flex-1 space-y-1">
+                                            <p className="font-medium">
+                                                This booking cannot be saved
+                                                yet: {plural(unplaced, 'guest')}{' '}
+                                                {unplaced === 1
+                                                    ? 'has'
+                                                    : 'have'}{' '}
+                                                no room.
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                The booking is for{' '}
+                                                {plural(pax, 'guest')}, but the{' '}
+                                                {lines.length === 1
+                                                    ? 'room'
+                                                    : 'rooms'}{' '}
+                                                added{' '}
+                                                {lines.length === 1
+                                                    ? 'has'
+                                                    : 'have'}{' '}
+                                                places for {placed}.{' '}
+                                                {needRooms === 0
+                                                    ? 'The rooms added can take everyone: raise the guests per room.'
+                                                    : suggestion === null
+                                                      ? 'No other free rooms can take the rest on these dates. Lower the number of guests or choose other dates.'
+                                                      : `Suggested: add ${suggestion
+                                                            .map(
+                                                                (room) =>
+                                                                    `${room.name} (up to ${room.pax_capacity})`,
+                                                            )
+                                                            .join(
+                                                                ' and ',
+                                                            )}, ${plural(lines.length + suggestion.length, 'room')} in total.`}
+                                            </p>
+                                        </div>
+                                        {suggestion !== null && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={applySuggestion}
+                                            >
+                                                <Plus />
+                                                {needRooms === 0
+                                                    ? 'Fill the rooms'
+                                                    : suggestion.length === 1
+                                                      ? 'Add suggested room'
+                                                      : 'Add suggested rooms'}
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
                                 <ul className="divide-y rounded-lg border">
                                     {lines.map((line, index) => {
                                         const room = roomById(line.room_id);
@@ -892,142 +1085,146 @@ export default function NewReservation({
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Payment now</CardTitle>
-                            <CardDescription>
-                                Optional. A downpayment of any amount, the full
-                                amount, or nothing; the balance is shown at
-                                check-in and check-out.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-6 sm:grid-cols-2">
-                            <FormField
-                                label="Amount paid"
-                                htmlFor="payment_amount"
-                                optional
-                                hint={
-                                    total > 0
-                                        ? `Total ${formatPeso(total)}.`
-                                        : undefined
-                                }
-                                error={errors.payment_amount}
-                            >
-                                <div className="relative">
-                                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
-                                        ₱
-                                    </span>
-                                    <Input
-                                        id="payment_amount"
-                                        type="number"
-                                        inputMode="decimal"
-                                        min={0}
-                                        step="0.01"
-                                        value={form.data.payment_amount}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'payment_amount',
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="0"
-                                        className="pl-7"
-                                    />
-                                </div>
-                            </FormField>
-                            {paying && (
-                                <>
-                                    <FormField
-                                        label="Paid with"
-                                        htmlFor="payment_method"
-                                        error={errors.payment_method}
-                                    >
-                                        <Select
-                                            value={form.data.payment_method}
-                                            onValueChange={(value) =>
-                                                form.setData(
-                                                    'payment_method',
-                                                    value,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger
-                                                id="payment_method"
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Choose" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {paymentMethods.map(
-                                                    (method) => (
-                                                        <SelectItem
-                                                            key={method}
-                                                            value={method}
-                                                        >
-                                                            {method}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
-                                    <FormField
-                                        label="Paid by"
-                                        htmlFor="paid_by"
-                                    >
-                                        <Select
-                                            value={form.data.paid_by}
-                                            onValueChange={(value) =>
-                                                form.setData(
-                                                    'paid_by',
-                                                    value as BookingForm['paid_by'],
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger
-                                                id="paid_by"
-                                                className="w-full"
-                                            >
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="guest">
-                                                    Guest
-                                                </SelectItem>
-                                                <SelectItem value="company">
-                                                    Company
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
-                                    <FormField
-                                        label="Receipt number"
-                                        htmlFor="receipt_number"
-                                        optional
-                                        error={errors.receipt_number}
-                                    >
+                    {!editing && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Payment now</CardTitle>
+                                <CardDescription>
+                                    Optional. A downpayment of any amount, the
+                                    full amount, or nothing; the balance is
+                                    shown at check-in and check-out.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="grid gap-6 sm:grid-cols-2">
+                                <FormField
+                                    label="Amount paid"
+                                    htmlFor="payment_amount"
+                                    optional
+                                    hint={
+                                        total > 0
+                                            ? `Total ${formatPeso(total)}.`
+                                            : undefined
+                                    }
+                                    error={errors.payment_amount}
+                                >
+                                    <div className="relative">
+                                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+                                            ₱
+                                        </span>
                                         <Input
-                                            id="receipt_number"
-                                            value={form.data.receipt_number}
+                                            id="payment_amount"
+                                            type="number"
+                                            inputMode="decimal"
+                                            min={0}
+                                            step="0.01"
+                                            value={form.data.payment_amount}
                                             onChange={(event) =>
                                                 form.setData(
-                                                    'receipt_number',
+                                                    'payment_amount',
                                                     event.target.value,
                                                 )
                                             }
+                                            placeholder="0"
+                                            className="pl-7"
                                         />
-                                    </FormField>
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
+                                    </div>
+                                </FormField>
+                                {paying && (
+                                    <>
+                                        <FormField
+                                            label="Paid with"
+                                            htmlFor="payment_method"
+                                            error={errors.payment_method}
+                                        >
+                                            <Select
+                                                value={form.data.payment_method}
+                                                onValueChange={(value) =>
+                                                    form.setData(
+                                                        'payment_method',
+                                                        value,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger
+                                                    id="payment_method"
+                                                    className="w-full"
+                                                >
+                                                    <SelectValue placeholder="Choose" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {paymentMethods.map(
+                                                        (method) => (
+                                                            <SelectItem
+                                                                key={method}
+                                                                value={method}
+                                                            >
+                                                                {method}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormField>
+                                        <FormField
+                                            label="Paid by"
+                                            htmlFor="paid_by"
+                                        >
+                                            <Select
+                                                value={form.data.paid_by}
+                                                onValueChange={(value) =>
+                                                    form.setData(
+                                                        'paid_by',
+                                                        value as BookingForm['paid_by'],
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger
+                                                    id="paid_by"
+                                                    className="w-full"
+                                                >
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="guest">
+                                                        Guest
+                                                    </SelectItem>
+                                                    <SelectItem value="company">
+                                                        Company
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormField>
+                                        <FormField
+                                            label="Receipt number"
+                                            htmlFor="receipt_number"
+                                            optional
+                                            error={errors.receipt_number}
+                                        >
+                                            <Input
+                                                id="receipt_number"
+                                                value={form.data.receipt_number}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'receipt_number',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80">
                         <p
                             role="status"
                             className={cn(
                                 'flex items-center gap-2 text-sm',
-                                form.hasErrors || blockedLines.length > 0
+                                form.hasErrors ||
+                                    blockedLines.length > 0 ||
+                                    unplaced > 0
                                     ? 'font-medium text-red-600 dark:text-red-400'
                                     : 'text-muted-foreground',
                             )}
@@ -1036,6 +1233,8 @@ export default function NewReservation({
                                 'Not saved. Check the highlighted fields above.'
                             ) : blockedLines.length > 0 ? (
                                 'Remove the rooms that are not free for these dates.'
+                            ) : unplaced > 0 ? (
+                                `Not enough room: ${placed} of ${pax} guests have a place. See the suggestion above.`
                             ) : lines.length === 0 ? (
                                 'Add at least one room.'
                             ) : (
@@ -1049,16 +1248,25 @@ export default function NewReservation({
                         </p>
                         <div className="flex gap-2">
                             <Button type="button" variant="ghost" asChild>
-                                <Link href={reservationsIndex()}>Cancel</Link>
+                                <Link
+                                    href={
+                                        editing
+                                            ? reservationsShow(editing.id)
+                                            : reservationsIndex()
+                                    }
+                                >
+                                    Cancel
+                                </Link>
                             </Button>
-                            {(walkIn || arrivesToday) && (
+                            {!editing && (walkIn || arrivesToday) && (
                                 <Button
                                     type="button"
                                     variant="outline"
                                     disabled={
                                         form.processing ||
                                         lines.length === 0 ||
-                                        blockedLines.length > 0
+                                        blockedLines.length > 0 ||
+                                        unplaced > 0
                                     }
                                     onClick={() => save(!walkIn)}
                                 >
@@ -1072,13 +1280,16 @@ export default function NewReservation({
                                 disabled={
                                     form.processing ||
                                     lines.length === 0 ||
-                                    blockedLines.length > 0
+                                    blockedLines.length > 0 ||
+                                    unplaced > 0
                                 }
                             >
                                 {form.processing && <Spinner />}
-                                {walkIn
-                                    ? 'Save and check in'
-                                    : 'Save reservation'}
+                                {editing
+                                    ? 'Save changes'
+                                    : walkIn
+                                      ? 'Save and check in'
+                                      : 'Save reservation'}
                             </Button>
                         </div>
                     </div>
@@ -1130,11 +1341,27 @@ function RoomRow({
 NewReservation.layout = (props: Props) => ({
     breadcrumbs: [
         { title: 'Reservations', href: reservationsIndex() },
-        props.walkIn
-            ? {
-                  title: 'Walk-in',
-                  href: reservationsCreate({ query: { walk_in: 1 } }),
-              }
-            : { title: 'New reservation', href: reservationsCreate() },
+        ...(props.editing
+            ? [
+                  {
+                      title: `#${props.editing.id} ${props.editing.contact_name}`,
+                      href: reservationsShow(props.editing.id),
+                  },
+                  {
+                      title: 'Edit',
+                      href: reservationsEdit(props.editing.id),
+                  },
+              ]
+            : [
+                  props.walkIn
+                      ? {
+                            title: 'Walk-in',
+                            href: reservationsCreate({ query: { walk_in: 1 } }),
+                        }
+                      : {
+                            title: 'New reservation',
+                            href: reservationsCreate(),
+                        },
+              ]),
     ],
 });

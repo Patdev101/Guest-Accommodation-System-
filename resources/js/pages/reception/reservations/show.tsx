@@ -5,6 +5,7 @@ import {
     IdCard,
     ImageIcon,
     LogIn,
+    Pencil,
     Plus,
     UserX,
 } from 'lucide-react';
@@ -117,7 +118,13 @@ type Props = {
         status_label: string;
     }[];
     stay: Stay | null;
-    can: { check_in: boolean; pay: boolean; cancel: boolean; no_show: boolean };
+    can: {
+        check_in: boolean;
+        edit: boolean;
+        pay: boolean;
+        cancel: boolean;
+        no_show: boolean;
+    };
     paymentMethods: string[];
     noShowRefund: number;
 };
@@ -209,6 +216,18 @@ export default function ReservationPage({
                                             (grace period)
                                         </TooltipContent>
                                     </Tooltip>
+                                )}
+                                {can.edit && (
+                                    <Button variant="outline" asChild>
+                                        <Link
+                                            href={ReservationController.edit(
+                                                reservation.id,
+                                            )}
+                                        >
+                                            <Pencil />
+                                            Edit
+                                        </Link>
+                                    </Button>
                                 )}
                                 {can.cancel && (
                                     <Button

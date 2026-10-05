@@ -11,6 +11,7 @@ use App\Enums\PaymentType;
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reception\StoreReservationRequest;
+use App\Models\ExtensionMove;
 use App\Models\Guest;
 use App\Models\Location;
 use App\Models\Payment;
@@ -98,6 +99,22 @@ class ReservationController extends Controller
 
     public function create(Request $request, Availability $availability): Response
     {
+        return $this->bookingPage($request, $availability);
+    }
+
+    /** The booking page again, filled in, to change an active reservation. */
+    public function edit(Request $request, Reservation $reservation, Availability $availability): Response|RedirectResponse
+    {
+        if (! $reservation->isActive()) {
+            return $this->notActive($reservation);
+        }
+
+        return $this->bookingPage($request, $availability, $reservation->load(['guest', 'rooms']));
+    }
+
+    /** The booking page: new, or editing a reservation (its own rooms then count as free). */
+    private function bookingPage(Request $request, Availability $availability, ?Reservation $editing = null): Response
+    {
         $query = Validator::make($request->query(), [
             'starts_at' => ['date_format:'.StoreReservationRequest::DATE_FORMAT],
             'ends_at' => ['date_format:'.StoreReservationRequest::DATE_FORMAT],
@@ -112,11 +129,11 @@ class ReservationController extends Controller
 
         // A walk-in arrives now (rounded up to the quarter hour); a booking uses the standard check-in time.
         $soon = CarbonImmutable::now()->addMinutes(14);
-        $start = self::parseTime($query['starts_at'] ?? null) ?? ($walkIn
+        $start = self::parseTime($query['starts_at'] ?? null) ?? $editing->starts_at ?? ($walkIn
             ? $soon->setTime($soon->hour, intdiv($soon->minute, 15) * 15)
             : CarbonImmutable::today()->setTimeFromTimeString($checkIn));
-        $end = self::parseTime($query['ends_at'] ?? null) ?? $start->copy()->addDay()->setTimeFromTimeString($checkOut);
-        $pax = (int) ($query['pax'] ?? 1);
+        $end = self::parseTime($query['ends_at'] ?? null) ?? $editing->ends_at ?? $start->copy()->addDay()->setTimeFromTimeString($checkOut);
+        $pax = (int) ($query['pax'] ?? ($editing ? $editing->rooms->sum('pax') : 1));
         $locationId = isset($query['location']) ? (int) $query['location'] : null;
         $validWindow = $end->gt($start);
 
@@ -127,7 +144,7 @@ class ReservationController extends Controller
             ->sortBy(fn (Room $room) => $room->location->name."\0".$room->name, SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
-        $periods = $validWindow ? $availability->busyPeriods(Availability::ids($rooms)) : [];
+        $periods = $validWindow ? $availability->busyPeriods(Availability::ids($rooms), $editing?->id) : [];
 
         $roomOptions = $rooms->map(function (Room $room) use ($availability, $start, $end, $periods, $validWindow) {
             $blocked = match (true) {
@@ -176,6 +193,23 @@ class ReservationController extends Controller
             'paymentMethods' => Payment::METHODS,
             'standardTimes' => ['check_in' => $checkIn, 'check_out' => $checkOut],
             'walkIn' => $walkIn,
+            // Filled when an existing reservation is being changed.
+            'editing' => $editing === null ? null : [
+                'id' => $editing->id,
+                'contact_name' => $editing->guest->name,
+                'contact_number' => $editing->guest->contact_number,
+                'email' => $editing->guest->email,
+                'company' => $editing->company,
+                'purpose' => $editing->purpose,
+                'guest_type' => $editing->guest->type->value,
+                'paid' => number_format($editing->amountPaid(), 2, '.', ''),
+                'rooms' => $editing->rooms->map(fn (ReservationRoom $line) => [
+                    'room_id' => $line->room_id,
+                    'room_rate_id' => $line->room_rate_id,
+                    'pax' => $line->pax,
+                    'price' => (string) (float) $line->price,
+                ])->values(),
+            ],
         ]);
     }
 
@@ -244,6 +278,73 @@ class ReservationController extends Controller
         return $request->boolean('check_in_now')
             ? to_route('reception.reservations.check-in.create', $reservation)
             : to_route('reception.reservations.show', $reservation);
+    }
+
+    /** Change an active reservation: dates, rooms, guests per room, prices and contact details. */
+    public function update(StoreReservationRequest $request, Reservation $reservation, Availability $availability, FrontDeskAlerts $alerts): RedirectResponse
+    {
+        if (! $reservation->isActive()) {
+            return $this->notActive($reservation);
+        }
+
+        $start = $request->startsAt();
+        $end = $request->endsAt();
+        $lines = $request->roomLines();
+        $paid = $reservation->amountPaid();
+
+        if ($request->total() < $paid) {
+            throw ValidationException::withMessages([
+                'rooms' => __('₱:paid was already paid, so the total cannot be less than that. Raise the prices, or cancel the booking to refund it.', ['paid' => number_format($paid, 2)]),
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $reservation, $availability, $start, $end, $lines) {
+            // Lock the rooms so two desks cannot book the same room at once.
+            $rooms = Room::query()->whereKey(array_column($lines, 'room_id'))->lockForUpdate()->get()->keyBy('id');
+            // This reservation's own rooms and dates do not block it.
+            $periods = $availability->busyPeriods(Availability::ids($rooms), $reservation->id);
+
+            foreach ($lines as $index => $line) {
+                $room = $rooms[$line['room_id']];
+                $reason = $availability->blockedReason($room, $start, $end, $periods[$room->id]);
+
+                if ($reason !== null) {
+                    throw ValidationException::withMessages([
+                        "rooms.{$index}.room_id" => __(':room is not free for these dates: :reason', ['room' => $room->name, 'reason' => $reason]),
+                    ]);
+                }
+            }
+
+            // A room that another guest's extension is waiting on cannot be dropped here.
+            $removed = $reservation->rooms()->whereNotIn('room_id', array_column($lines, 'room_id'))->get();
+
+            if (ExtensionMove::query()->whereIn('reservation_room_id', $removed->modelKeys())->exists()) {
+                throw ValidationException::withMessages([
+                    'rooms' => __('A room in this booking is part of another guest’s extension request. Answer that request first.'),
+                ]);
+            }
+
+            $reservation->update([
+                'guest_id' => $this->contactPerson($request)->id,
+                'company' => $request->validated('company'),
+                'purpose' => $request->validated('purpose'),
+                'starts_at' => $start,
+                'ends_at' => $end,
+                'total' => $request->total(),
+            ]);
+
+            $reservation->rooms()->whereKey($removed->modelKeys())->delete();
+
+            foreach ($lines as $line) {
+                $reservation->rooms()->updateOrCreate(['room_id' => $line['room_id']], $line);
+            }
+        });
+
+        $alerts->changed($reservation, $request->user());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Reservation updated.')]);
+
+        return to_route('reception.reservations.show', $reservation);
     }
 
     public function show(Reservation $reservation): Response
@@ -326,6 +427,7 @@ class ReservationController extends Controller
             ],
             'can' => [
                 'check_in' => $reservation->isActive(),
+                'edit' => $reservation->isActive(),
                 'pay' => $reservation->isActive() && $balance > 0,
                 'cancel' => $reservation->isActive(),
                 'no_show' => $reservation->isActive() && now()->gte($noShowFrom),

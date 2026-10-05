@@ -146,6 +146,98 @@ class ReservationTest extends TestCase
         $this->assertSame(0, Reservation::query()->count());
     }
 
+    public function test_a_booking_that_leaves_guests_without_a_room_is_refused()
+    {
+        // 10 guests, but the two rooms take 4 + 2.
+        $this->actingAs($this->desk)
+            ->post(route('reception.reservations.store'), $this->booking(['guests' => 10]))
+            ->assertSessionHasErrors(['rooms' => 'The rooms have places for 6, but the booking is for 10 guests: 4 guests have no room. Add another room.']);
+        $this->assertSame(0, Reservation::query()->count());
+
+        // Everyone placed: accepted.
+        $this->actingAs($this->desk)
+            ->post(route('reception.reservations.store'), $this->booking(['guests' => 6]))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(1, Reservation::query()->count());
+    }
+
+    public function test_reception_edits_an_active_reservation()
+    {
+        $this->actingAs($this->desk)->post(route('reception.reservations.store'), $this->booking());
+        $reservation = Reservation::query()->sole();
+        $c = $this->roomWithRate('A-103', pax: 6, price: 900);
+
+        // The page opens filled in, and the booking's own rooms count as free.
+        $this->actingAs($this->desk)
+            ->get(route('reception.reservations.edit', $reservation))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('reception/reservations/create')
+                ->where('editing.id', $reservation->id)
+                ->where('editing.contact_name', 'Engr. Dela Cruz')
+                ->where('editing.paid', '1000.00')
+                ->has('editing.rooms', 2)
+                ->where('window.starts_at', '2026-10-02T14:00')
+                ->where('window.pax', 6)
+                ->where('rooms.0.blocked_reason', null)
+                ->where('rooms.1.blocked_reason', null));
+
+        // Move a day later, keep A-101, swap A-102 for A-103, new contact number.
+        $changes = $this->booking([
+            'contact_number' => '0918 000 1111',
+            'purpose' => 'Hull repair, phase 2',
+            'starts_at' => '2026-10-03T14:00',
+            'ends_at' => '2026-10-05T12:00',
+            'guests' => 9,
+            'rooms' => [
+                ['room_id' => $this->a->id, 'room_rate_id' => $this->a->rates()->value('id'), 'pax' => 4, 'price' => '1600'],
+                ['room_id' => $c->id, 'room_rate_id' => $c->rates()->value('id'), 'pax' => 5, 'price' => '1800'],
+            ],
+            'payment_amount' => '',
+            'payment_method' => '',
+        ]);
+
+        $this->actingAs($this->desk)
+            ->put(route('reception.reservations.update', $reservation), $changes)
+            ->assertRedirect(route('reception.reservations.show', $reservation));
+
+        $reservation->refresh();
+        $this->assertSame('2026-10-03 14:00', $reservation->starts_at->format('Y-m-d H:i'));
+        $this->assertSame('3400.00', $reservation->total);
+        $this->assertSame('Hull repair, phase 2', $reservation->purpose);
+        $this->assertSame('0918 000 1111', $reservation->guest->contact_number);
+        $this->assertSame(['A-101', 'A-103'], $reservation->rooms()->with('room')->get()->map(fn ($line) => $line->room->name)->sort()->values()->all());
+        $this->assertSame(1, Reservation::query()->count());
+        // The payment stays; A-102 is free again.
+        $this->assertSame('1000.00', $reservation->payments()->sole()->amount);
+        $this->assertNull(app(Availability::class)->blockedReason($this->b, Carbon::parse('2026-10-03 14:00'), Carbon::parse('2026-10-05 12:00')));
+
+        // Refused: a room taken by someone else, a total below what was paid, guests without a room.
+        $this->reserve([$this->b], Carbon::parse('2026-10-04 14:00'), Carbon::parse('2026-10-05 12:00'));
+        $taken = $changes;
+        $taken['rooms'][1] = ['room_id' => $this->b->id, 'room_rate_id' => $this->b->rates()->value('id'), 'pax' => 4, 'price' => '1600'];
+        $this->actingAs($this->desk)->put(route('reception.reservations.update', $reservation), [...$taken, 'guests' => 8])
+            ->assertSessionHasErrors('rooms.1.room_id');
+
+        $cheap = $changes;
+        $cheap['rooms'] = [['room_id' => $this->a->id, 'room_rate_id' => $this->a->rates()->value('id'), 'pax' => 4, 'price' => '500']];
+        $this->actingAs($this->desk)->put(route('reception.reservations.update', $reservation), [...$cheap, 'guests' => 4])
+            ->assertSessionHasErrors('rooms');
+
+        $this->actingAs($this->desk)->put(route('reception.reservations.update', $reservation), [...$changes, 'guests' => 12])
+            ->assertSessionHasErrors('rooms');
+
+        $this->assertSame('3400.00', $reservation->refresh()->total);
+
+        // A cancelled reservation cannot be edited.
+        $this->actingAs($this->desk)->patch(route('reception.reservations.cancel', $reservation), ['reason' => 'Trip moved']);
+        $this->actingAs($this->desk)->get(route('reception.reservations.edit', $reservation))
+            ->assertRedirect(route('reception.reservations.show', $reservation));
+        $this->actingAs($this->desk)->put(route('reception.reservations.update', $reservation), $changes)
+            ->assertRedirect(route('reception.reservations.show', $reservation));
+        $this->assertSame(ReservationStatus::Cancelled, $reservation->refresh()->status);
+    }
+
     public function test_guests_cannot_use_the_front_desk_but_admins_can()
     {
         $this->actingAs(User::factory()->create())
@@ -254,7 +346,7 @@ class ReservationTest extends TestCase
                 ->component('reception/reservations/show')
                 ->has('rooms', 2)
                 ->where('reservation.balance', '1600.00')
-                ->where('can', ['check_in' => true, 'pay' => true, 'cancel' => true, 'no_show' => false])
+                ->where('can', ['check_in' => true, 'edit' => true, 'pay' => true, 'cancel' => true, 'no_show' => false])
                 ->where('stay', null));
     }
 }

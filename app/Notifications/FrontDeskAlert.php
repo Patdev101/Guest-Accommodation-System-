@@ -13,7 +13,7 @@ class FrontDeskAlert extends Notification
     use Queueable;
 
     /** Alerts for reception. */
-    public const DESK_KINDS = ['checkout_call', 'not_arrived', 'arriving', 'booked', 'cancelled', 'room_ready', 'extension_waiting', 'extension'];
+    public const DESK_KINDS = ['checkout_call', 'not_arrived', 'arriving', 'booked', 'changed', 'cancelled', 'room_ready', 'extension_waiting', 'extension'];
 
     /** Alerts for the Admin. */
     public const ADMIN_KINDS = ['repair'];
