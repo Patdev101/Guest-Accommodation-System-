@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reception;
 
 use App\Enums\RefundStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Models\Refund;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class RefundController extends Controller
 
         return Inertia::render('reception/refunds', [
             'refunds' => Refund::query()
-                ->with(['reservation.guest:id,name,contact_number', 'requester:id,name', 'processor:id,name', 'refunder:id,name'])
+                ->with(['reservation.guest:id,name,contact_number', 'stay.guest:id,name,contact_number', 'requester:id,name', 'processor:id,name', 'refunder:id,name'])
                 ->when($show === 'open', fn ($query) => $query->whereIn('status', $open)->orderBy('requested_at'))
                 ->when($show === 'refunded', fn ($query) => $query->where('status', RefundStatus::Refunded)->orderByDesc('refunded_at'))
                 ->when($show === 'all', fn ($query) => $query->orderByDesc('requested_at'))
@@ -37,8 +38,11 @@ class RefundController extends Controller
                 ->through(fn (Refund $refund) => [
                     'id' => $refund->id,
                     'reservation_id' => $refund->reservation_id,
-                    'guest' => $refund->reservation?->guest->name,
-                    'contact_number' => $refund->reservation?->guest->contact_number,
+                    'stay_id' => $refund->stay_id,
+                    'guest' => ($refund->stay ?? $refund->reservation)?->guest->name,
+                    'contact_number' => ($refund->stay ?? $refund->reservation)?->guest->contact_number,
+                    'method' => $refund->method,
+                    'reference' => $refund->reference,
                     'amount' => $refund->amount,
                     'reason' => $refund->reason,
                     'status' => $refund->status->value,
@@ -52,6 +56,7 @@ class RefundController extends Controller
                     'refunded_at' => $refund->refunded_at?->toIso8601String(),
                 ]),
             'show' => $show,
+            'methods' => Payment::methods(),
             'openTotal' => number_format((float) Refund::query()->whereIn('status', $open)->sum('amount'), 2, '.', ''),
             'openCount' => Refund::query()->whereIn('status', $open)->count(),
         ]);
@@ -68,9 +73,17 @@ class RefundController extends Controller
             return back();
         }
 
+        // Giving the money back needs a record of how it went (and a reference, if any).
+        $how = $next === RefundStatus::Refunded
+            ? $request->validate([
+                'method' => ['required', Rule::in(Payment::methods())],
+                'reference' => ['nullable', 'string', 'max:100'],
+            ], ['method.required' => __('Choose how the money was given back.')])
+            : [];
+
         $refund->update(match ($next) {
             RefundStatus::Processing => ['status' => $next, 'processed_by' => $request->user()->id, 'processing_at' => now()],
-            default => ['status' => $next, 'refunded_by' => $request->user()->id, 'refunded_at' => now()],
+            default => ['status' => $next, 'refunded_by' => $request->user()->id, 'refunded_at' => now(), ...$how],
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => $next === RefundStatus::Refunded

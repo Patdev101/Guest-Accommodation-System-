@@ -4,6 +4,8 @@ import {
     BedSingle,
     CalendarCheck,
     CalendarDays,
+    ChartColumn,
+    DatabaseBackup,
     HandCoins,
     History,
     LayoutGrid,
@@ -29,6 +31,8 @@ import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as roomsIndex } from '@/routes/admin/rooms';
 import { edit as settingsEdit } from '@/routes/admin/settings';
 import { index as usersIndex } from '@/routes/admin/users';
+import { edit as optionsEdit } from '@/routes/admin/options';
+import { index as reportsIndex } from '@/routes/admin/reports';
 import { calendar } from '@/routes/reception';
 import { index as refundsIndex } from '@/routes/reception/refunds';
 import { index as reservationsIndex } from '@/routes/reception/reservations';
@@ -77,7 +81,17 @@ const sections: NavSection[] = [
             },
             { title: 'Locations', href: locationsIndex(), icon: MapPin },
             { title: 'System settings', href: settingsEdit(), icon: Settings2 },
+            {
+                title: 'Options and backups',
+                href: optionsEdit(),
+                icon: DatabaseBackup,
+            },
         ],
+    },
+    {
+        label: 'Records',
+        roles: ['admin'],
+        items: [{ title: 'Reports', href: reportsIndex(), icon: ChartColumn }],
     },
     {
         label: 'Accounts',

@@ -55,6 +55,7 @@ type Rate = { id: number; name: string; price: string; unit: string };
 
 type RoomOption = RoomSummary & {
     blocked_reason: string | null;
+    inclusions: string[];
     rates: Rate[];
 };
 
@@ -1331,6 +1332,11 @@ function RoomRow({
                             ? `${room.rates.length > 1 ? 'from ' : ''}${formatPeso(cheapest.price)} / ${cheapest.unit.toLowerCase()}`
                             : '')}
                 </p>
+                {!muted && room.inclusions.length > 0 && (
+                    <p className="truncate text-xs text-muted-foreground">
+                        Includes: {room.inclusions.join(', ')}
+                    </p>
+                )}
             </div>
             <RoomStatusBadge group={room.group} label={room.status_label} />
             {action}

@@ -16,10 +16,14 @@ use App\Models\Refund;
 use App\Models\Reservation;
 use App\Models\ReservationRoom;
 use App\Models\Room;
+use App\Models\RoomInclusion;
+use App\Models\RoomRate;
 use App\Models\Setting;
 use App\Models\Stay;
+use App\Models\StayGuest;
 use App\Models\StayRoom;
 use App\Models\User;
+use App\Services\Reports;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
@@ -79,6 +83,7 @@ class DashboardController extends Controller
                     ->count(),
                 'settingsReviewed' => Setting::query()->whereKey(SettingsController::REVIEWED_KEY)->exists(),
             ],
+            'trends' => app(Reports::class)->trends(),
             'recentMaintenance' => MaintenanceRecord::query()
                 ->with('room.location')
                 ->orderByDesc('performed_on')
@@ -125,7 +130,16 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        $rooms = Room::query()->with('location:id,name')->get();
+        // Prices and inclusions come along, so reception can read them from the board.
+        $rooms = Room::query()->with(['location:id,name', 'coverPhoto', 'rates.unit:id,name', 'inclusions'])->get();
+
+        // The people in each occupied room, and the company they came with.
+        $inRoom = StayGuest::query()
+            ->whereHas('stay', fn ($query) => $query->whereNull('checked_out_at'))
+            ->with('stay.reservation:id,company')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('room_id');
         $upcoming = ReservationRoom::query()
             ->whereHas('reservation', fn ($query) => $query
                 ->where('status', ReservationStatus::Active)
@@ -203,6 +217,22 @@ class DashboardController extends Controller
                     'group' => $status->group()->value,
                 ], $room->status->manualTransitions()),
                 'upcoming_reservations' => (int) ($upcoming[$room->id] ?? 0),
+                // Read-only details for the room panel; the Admin sets them.
+                'description' => $room->description,
+                'rates' => $room->rates->sortBy([['is_extension_rate', 'asc'], ['price', 'asc']])->values()->map(fn (RoomRate $rate) => [
+                    'id' => $rate->id,
+                    'name' => $rate->name,
+                    'unit' => $rate->unit->name,
+                    'price' => $rate->price,
+                    'is_extension' => $rate->is_extension_rate,
+                ]),
+                'inclusions' => $room->inclusions->map(fn (RoomInclusion $inclusion) => [
+                    'id' => $inclusion->id,
+                    'item' => $inclusion->item,
+                    'quantity' => $inclusion->quantity,
+                ])->values(),
+                'company' => ($inRoom[$room->id] ?? collect())->first()?->stay->reservation?->company,
+                'guest_names' => ($inRoom[$room->id] ?? collect())->pluck('name')->values(),
             ]),
             // The house rules reception works by, shown under the board.
             'rules' => [

@@ -1,27 +1,27 @@
-# Guest Accommodation System
+    # Guest Accommodation System
 
-**Last updated:** 30 September 2026
-**Status:** Phases 1–2 and the admin tools are done. **Reception was started on 30 Sep 2026 (owner asked):** **the whole front desk is done**: reservations (group bookings, availability, earliest slot, payments, cancellation, no-show, refunds), **check-in with the owner's form**, **check-out, inspection, billing and ID return**, calls before check-out, **extensions with Guest B's consent**, and a **week calendar**. Still to build (section 13, "What is left"): notifications and the scheduler, the guest (online) side (on hold), reports, and the parked admin extras.
+    **Last updated:** 6 October 2026
+    **Status:** The admin side and the whole front desk are built and tested: reservations (group bookings, **editing**, availability, payments, cancellation, no-show, refunds), check-in with the owner's form, check-out, inspection, billing and ID return, extensions, the week calendar, staff alerts with a scheduler, and account setup by emailed link. The latest changes (2 to 6 Oct 2026) are listed in section 2, "Recent changes". Still to build (section 13, "What is left"): the guest (online) side (on hold), reports, and the parked admin extras.
 
-This README is the full context for anyone, human or AI, continuing this project. Read it before changing anything. The detailed business requirements are in `docs/guest-accommodation-documentation.html` (PDF: `Guest-Accommodation-Documentation.pdf`, v1.1). This README summarises them and records every decision made since.
+    This README is the full context for anyone, human or AI, continuing this project. Read it before changing anything. The detailed business requirements are in `docs/guest-accommodation-documentation.html` (PDF: `Guest-Accommodation-Documentation.pdf`, v1.1). This README summarises them and records every decision made since.
 
----
+    ---
 
-## 0. How to work on this project (read first if you are an AI assistant)
+    ## 0. How to work on this project (read first if you are an AI assistant)
 
-- **You may not have the code.** The owner will paste files you ask for. Ask for exact paths from the code map (section 8), a few at a time. Do not guess file contents.
-- **Give changes the owner can apply without interpretation:** either a complete replacement file, or an exact "find this / replace with this" edit. Always state the full path.
-- **Give commands for Windows PowerShell 5.1.** The machine runs Windows 11. `git` is not on PATH in the owner's terminal (the owner uses GitHub Desktop). There is no `&&` in PowerShell 5.1; use `;`.
-- **After every change,** tell the owner to run the checks in section 5 and to paste any failure output back.
-- **Follow the conventions in section 9 exactly.** They exist because of problems already hit, such as server-rendering mismatches and SQL Server cascade errors.
-- **The owner's preferences:**
-    - short, clear answers
-    - step-by-step instructions
-    - admin features first
-    - consistent, easy-to-use UI (see section 9, "UX rules")
-- **Unclear rules:** if a business rule is not covered here or in the requirements document, ask the owner. Do not invent one. Open questions are listed in section 12.
+    - **You may not have the code.** The owner will paste files you ask for. Ask for exact paths from the code map (section 8), a few at a time. Do not guess file contents.
+    - **Give changes the owner can apply without interpretation:** either a complete replacement file, or an exact "find this / replace with this" edit. Always state the full path.
+    - **Give commands for Windows PowerShell 5.1.** The machine runs Windows 11. `git` is not on PATH in the owner's terminal (the owner uses GitHub Desktop). There is no `&&` in PowerShell 5.1; use `;`.
+    - **After every change,** tell the owner to run the checks in section 5 and to paste any failure output back.
+    - **Follow the conventions in section 9 exactly.** They exist because of problems already hit, such as server-rendering mismatches and SQL Server cascade errors.
+    - **The owner's preferences:**
+        - short, clear answers
+        - step-by-step instructions
+        - admin features first
+        - consistent, easy-to-use UI (see section 9, "UX rules")
+    - **Unclear rules:** if a business rule is not covered here or in the requirements document, ask the owner. Do not invent one. Open questions are listed in section 12.
 
----
+    ---
 
 ## 1. What the system is
 
@@ -39,23 +39,55 @@ Guests self-register. Reception and Admin accounts are created by an Admin on th
 
 ## 2. Current status
 
-| Phase                           | Scope                                                                                                                                             | Status      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| 1. Foundation                   | SQL Server connection, login and registration, three roles, full database schema                                                                  | ✅ Done     |
-| 2. Admin setup                  | Locations, rooms, inclusions, rates, maintenance, settings, admin dashboard, UX pass                                                              | ✅ Done     |
-| 2b. Room photos                 | Admin uploads photos per room, drags them into order, adds captions, picks the cover photo                                                        | ✅ Done     |
-| 2c. Admin tools                 | Copy a room, standard check-in/out times, safer accounts (confirm role change, reset password, deactivate, last-admin guard), activity log, email | ✅ Done     |
-| 2d. ID types                    | Admin-managed list of accepted IDs (add, rename, turn off, delete when unused); `id_custody` now links to it                                      | ✅ Done     |
-| 2e. Admin extras                | Companies list, reports, admin calendar, dashboard trends                                                                                         | Pending     |
-| 3a. Front-desk reservations     | Group bookings (several rooms), availability, earliest slot, price suggestion, payments, cancellation, no-show, refunds, reception dashboard      | ✅ Done     |
-| 3b. Guest side                  | Public room browsing (Airbnb-style), online booking by guests, availability calendar                                                              | On hold     |
-| 4a. Check-in                    | Owner's check-in form (guest list with rooms, ID with private photo), verification, walk-ins, reception room status changes                       | ✅ Done     |
-| 4b. Check-out and billing       | Check-out, inspection, damages and charges, final bill, payments, ID return, cleaning                                                             | ✅ Done     |
-| 5a. Stay management             | Calls before check-out (call log), "not extending", extensions with Guest B's consent, week calendar, room status board                           | ✅ Done     |
-| 5b. Notifications and scheduler | Staff alert bell, scheduler for the check-out call, late and arriving guests; room ready and extension alerts; dashboard refreshes every minute   | ✅ Done     |
-| 5c. Front-desk UX pass          | Dashboard search, Walk-in button, clickable stat tiles, one-click Check in from lists, clearable number boxes, date + time fields                 | ✅ Done     |
-| 5d. Figma-inspired layout       | Room cards with guest, pax and times; board filters; "Today" panel; house rules strip; check-in progress and stay summary; role under user name   | ✅ Done     |
-| 6. Reports                      | Guest log, held IDs, unpaid company bills, occupancy                                                                                              | Not started |
+| Phase                           | Scope                                                                                                                                                  | Status  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| 1. Foundation                   | SQL Server connection, login and registration, three roles, full database schema                                                                       | ✅ Done |
+| 2. Admin setup                  | Locations, rooms, inclusions, rates, maintenance, settings, admin dashboard, UX pass                                                                   | ✅ Done |
+| 2b. Room photos                 | Admin uploads photos per room, drags them into order, adds captions, picks the cover photo                                                             | ✅ Done |
+| 2c. Admin tools                 | Copy a room, standard check-in/out times, safer accounts (confirm role change, reset password, deactivate, last-admin guard), activity log, email      | ✅ Done |
+| 2d. ID types                    | Admin-managed list of accepted IDs (add, rename, turn off, delete when unused); `id_custody` now links to it                                           | ✅ Done |
+| 2e. Admin extras                | Companies list, reports, admin calendar, dashboard trends                                                                                              | Pending |
+| 3a. Front-desk reservations     | Group bookings (several rooms), availability, earliest slot, price suggestion, payments, cancellation, no-show, refunds, reception dashboard           | ✅ Done |
+| 3b. Guest side                  | Public room browsing (Airbnb-style), online booking by guests, availability calendar                                                                   | On hold |
+| 4a. Check-in                    | Owner's check-in form (guest list with rooms, ID with private photo), verification, walk-ins, reception room status changes                            | ✅ Done |
+| 4b. Check-out and billing       | Check-out, inspection, damages and charges, final bill, payments, ID return, cleaning                                                                  | ✅ Done |
+| 5a. Stay management             | Calls before check-out (call log), "not extending", extensions with Guest B's consent, week calendar, room status board                                | ✅ Done |
+| 5b. Notifications and scheduler | Staff alert bell, scheduler for the check-out call, late and arriving guests; room ready and extension alerts; dashboard refreshes every minute        | ✅ Done |
+| 5c. Front-desk UX pass          | Dashboard search, Walk-in button, clickable stat tiles, one-click Check in from lists, clearable number boxes, date + time fields                      | ✅ Done |
+| 5d. Figma-inspired layout       | Room cards with guest, pax and times; board filters; "Today" panel; house rules strip; check-in progress and stay summary; role under user name        | ✅ Done |
+| 5e. Accounts by emailed link    | Admin never sets passwords: new accounts get a "set up your password" email (3 days), separate from "forgot password"; only staff roles created        | ✅ Done |
+| 5f. Booking rules and editing   | A booking that leaves guests without a room is refused, with free rooms suggested; active reservations can be edited                                   | ✅ Done |
+| 5g. Room details for reception  | Clicking a room on the dashboard shows its prices, inclusions, photo, description and the guests in it; inclusions on the booking page                 | ✅ Done |
+| 5h. Front-desk tools            | Printable bill, change room during a stay, late check-out fee, overpayment refunds, refund method and reference, room-clash warning, alerts by email   | ✅ Done |
+| 6. Reports and data care        | Admin reports (guest log, held IDs, unpaid bills, occupancy, income) with print and CSV; dashboard trends; payment methods; ID photo deletion; backups | ✅ Done |
+
+### Recent changes (2 to 6 October 2026)
+
+Newest first. Details are in the sections named.
+
+- **6 Oct: front-desk tools and admin reports (one batch, owner's list).**
+    - **Printable bill:** "Print bill" on the stay page opens a plain page (`reception.stays.bill`, `resources/views/print/bill.blade.php`) with charges, payments, totals and signature lines; print it or save it as PDF from the browser.
+    - **Room still occupied, next guest due:** the Today panel lists rooms where the last guest is still in and the next booking is due today; reception also gets a red **room clash** alert an hour before the arrival (`FrontDeskAlerts::roomClashes()`).
+    - **Change room during a stay:** "Change room" on each room of a stay (`reception.stays.rooms.move`). The new room must be Available, big enough and free until the check-out. The old room goes to Cleaning, or to Under maintenance with the reason logged and the Admin alerted. The bill is not changed; add a charge if the new room costs more.
+    - **Late check-out fee:** when a stay is past its check-out time, "Late check-out fee" adds one charge without changing the check-out time. Suggested amount: each room's hourly extension rate for every started hour (`reception.stays.late-fee`).
+    - **Overpayment refunds:** after check-out and inspection, a stay paid more than its bill shows "Refund ₱X"; it creates a refund linked to the stay (`refunds.stay_id`). `Stay::balance()` now adds back refunded overpayments; `Stay::overpaid()` is what is still owed back.
+    - **Refund method:** "Mark refunded" asks how the money was given back (one of the payment methods) and an optional reference number (`refunds.method`, `refunds.reference`).
+    - **Alerts by email:** in Options the Admin can switch on emailing the urgent alerts (call before check-out, not arrived, room clash, next guest must answer) to every active Reception account. A mail failure never blocks the desk. **SMS is not built:** it needs a paid SMS provider.
+    - **ID photos:** in Options the Admin sets how many days after an ID is returned its photo is deleted (0 = keep; default 0), and can delete the photos of all returned IDs at once. The ID's type and number stay. Runs nightly (`housekeeping:run`).
+    - **Reports** (Admin → Reports, `admin.reports.index`, `App\Services\Reports`): guest log, IDs held, unpaid bills by company, occupancy by location and income by method for a date range, with Print and CSV export.
+    - **Dashboard trends:** the Admin dashboard shows the last six months (income, occupancy, cancellations, no-shows) and the top companies.
+    - **Payment methods** are now a list the Admin edits in Options (setting `payment_methods`; `Payment::methods()` replaced the fixed `Payment::METHODS`).
+    - **Backups** (Admin → Options and backups, `App\Services\Housekeeping`): "Back up now" writes one zip with every table as JSON plus room photos and ID photos, in `storage/app/private/backups`; download or delete it there. One is also written every night at 2:00 AM by the scheduler; the newest 7 are kept (setting). Restoring is a manual job for a technician.
+    - New Admin sidebar links: **Options and backups** (Setup) and **Reports** (Records). Tests: `tests/Feature/Reception/StayToolsTest.php`, `tests/Feature/Admin/ReportsAndOptionsTest.php`.
+
+- **6 Oct: room details for reception.** On the reception dashboard, clicking a room opens a panel with the cover photo, who is in the room (contact person, company, the guests in that room by name, due-out time, "Open stay"), the next arrival ("Check in"), **every price the Admin set** (standard rates and the extension rate), **the inclusions**, the description, and the status buttons. Read-only: prices and inclusions are still changed only by the Admin. The booking page's room list also shows "Includes: …" per room. Data: `DashboardController::forReception()` (board fields `rates`, `inclusions`, `description`, `company`, `guest_names`), `RoomDialog` in `pages/reception/dashboard.tsx`, `inclusions` in `ReservationController::bookingPage()`.
+- **5 Oct: guests must all have a room** (section 6, rule 12). Refused with a suggestion of free rooms to add.
+- **5 Oct: edit a reservation** (section 11, first "Editing" bullet). Edit button on active reservations.
+- **5 Oct: account setup by email** (section 6, "Accounts and audit"). The Admin no longer types anyone's password; "set up your password" and "forgot password" are separate flows. Only Reception and Admin can be created or assigned on the Users page; a self-registered Guest row can be promoted.
+- **5 Oct: small fixes.** Edge showed two "show password" eyes (its built-in one is hidden in `resources/css/app.css`). Page header actions stay top right when the description is long (`components/page.tsx`).
+- **2 Oct: the Front desk section is hidden from the Admin's sidebar** for now (`components/app-sidebar.tsx`: `roles: ['reception']`; add `'admin'` back to show it). The Admin can still open those pages by address, and the Admin dashboard is unchanged.
+
+**A separate demo project exists:** `C:\Users\Temp\Documents\GitHub\reception-preview` (plain Laravel + Blade, database `guest_accommodation_simple`, port 8090). It is a simplified stand-in the owner shows to their supervisor. **It is not this system and shares nothing with it**; it has its own README. Do not copy code between them unless the owner asks.
 
 The owner first asked for admin screens only; on **30 Sep 2026 they asked to proceed to reception**. **Guest screens (online booking, public browsing) are still on hold until the owner asks.** The guest dashboard (`resources/js/pages/dashboard.tsx`) is a placeholder; reception has its own (`pages/reception/dashboard.tsx`).
 
@@ -70,7 +102,7 @@ Reservations are mainly **Reception's** job (walk-ins, managing all bookings, ca
 
 Verification at handoff:
 
-- **PHP tests:** 169 passing, 3 skipped (30 Sep 2026). The skipped ones are the starter kit's two-factor tests; two-factor login is switched off.
+- **PHP tests:** 181 passing, 3 skipped (6 Oct 2026). The skipped ones are the starter kit's two-factor tests; two-factor login is switched off.
 - **Static checks:** PHPStan, Pint, ESLint/format and TypeScript are all clean. The production build succeeds.
 - **SQL Server:** tested live against SQL Server Express. All admin pages load in about 0.2 to 0.4 seconds. Alerts checked live on 30 Sep 2026: `php artisan front-desk:alerts` sent the check-out calls for the two sample stays, and the bell listed them and marked them read.
 - **Email:** the "Send me a test email" button delivers to Mailpit (checked 30 Sep 2026).
@@ -620,7 +652,7 @@ Front-desk route names (prefix `reception`, middleware `role:reception,admin`): 
     - last-admin guard
 - **Activity log:** who changed what and when, with old → new values and filters.
 - **Front desk** (Reception and Admin, sidebar "Front desk"):
-    - reception dashboard: stat tiles in plain words ("Occupied rooms: 2 · Out of 12 rooms · 4 guests staying", "Available now", "Still to arrive today · 2 already checked in · 1 late", "Checking out today · 2 guests to call now") that open the matching list ("Available now" filters the board); search box (goes to all reservations); Walk-in and New reservation buttons; room cards showing who is in each room and when they leave, with location and status filters; clicking a room shows the guest, the next arrival (Check in) and status changes; "Today" panel with calls, late guests, arrivals, inspections and refunds; house rules strip; reloads every minute
+    - reception dashboard: stat tiles in plain words ("Occupied rooms: 2 · Out of 12 rooms · 4 guests staying", "Available now", "Still to arrive today · 2 already checked in · 1 late", "Checking out today · 2 guests to call now") that open the matching list ("Available now" filters the board); search box (goes to all reservations); Walk-in and New reservation buttons; room cards showing who is in each room and when they leave, with location and status filters; clicking a room opens the room details panel: photo, the guests in it, the next arrival (Check in), prices, inclusions, description and status changes; "Today" panel with calls, late guests, arrivals, inspections and refunds; house rules strip; reloads every minute
     - the sidebar shows the account's role (Admin / Reception / Guest) under the user's name
     - alert bell in the header: check-out calls, late guests, arrivals within the hour, rooms ready, extension answers (section 6, "Alerts as built"); the scheduler sends them even when nobody has the bell open
     - walk-in: the **Walk-in** button opens the booking page starting now (rounded up to the quarter hour); "Save and check in" goes straight to the check-in form
@@ -652,8 +684,10 @@ Front-desk route names (prefix `reception`, middleware `role:reception,admin`): 
 - **Stale project path:** `docs/` still mentions the old project folder path.
 - **Editing a reservation (built 5 Oct 2026):** an **Edit** button on an active reservation opens the booking page filled in (`reception.reservations.edit|update`, same page `reservations/create.tsx` with the `editing` prop). Dates, rooms, guests per room, prices and contact details can change; the booking's own rooms count as free; payments stay and are still recorded on the reservation page. Refused when a room is taken by someone else, when the new total is below what was already paid, or when a room is part of another guest's pending extension. Reception gets a "Booking changed" alert. Checked-in, cancelled and no-show reservations cannot be edited.
 - **The two sample stays** (converted to the group shape) have no reservation, so they have no room charges and no ID photo; their expected check-out has passed.
-- **Not built at the front desk:** discounts (only adding/removing extras), refunds of overpayments on a stay, billing a booked room that was not used at check-in, and alerts by SMS or email (alerts are in-app only).
-- **ID photos are personal data:** they sit in `storage/app/private/id-photos`. Include that folder in backups and delete photos when the retention period ends (to decide with the owner).
+- **Not built at the front desk:** discounts (only adding/removing extras), billing a booked room that was not used at check-in, and alerts by SMS (email alerts exist; SMS needs a paid provider).
+- **ID photos are personal data:** they sit in `storage/app/private/id-photos` and are included in backups. The Admin sets the retention period in Options (default: keep). **Backups also contain them**, so keep backup files private.
+- **Backups are a data export, not a one-click restore.** Each zip holds every table as JSON and the uploaded files. Bringing data back from one needs a technician. Download backups and keep a copy off the server.
+- **Nightly jobs need the scheduler** (section 5): ID photo deletion and the 2:00 AM backup run only when `php artisan schedule:run` is set up.
 - **Git:** changes have not been committed. Commit them in GitHub Desktop.
 
 ---
@@ -797,9 +831,13 @@ Then a layout pass from the owner's Figma mock-ups (a top-nav dashboard and a 4-
 ### What is left
 
 1. **Guest side (on hold until the owner asks):** Step B (public browsing) and Step C.3 (online booking), guest cancellations, Guest B answering the move request in the app, and the guest's own in-app notifications (rule 27; reuse `notifications` with a guest-side bell).
-2. **Reports (Phase 6):** guest log, held IDs, unpaid company bills (use `charges.billed_to` and `payments.paid_by`), occupancy; print and CSV.
-3. **Admin extras** still parked: companies list, admin calendar (reuse `pages/reception/calendar.tsx`), dashboard trends.
-4. **Front-desk polish:** printable bill, companies picker, discounts, refund method details, overpayment refunds (open questions 17 to 19).
+2. **Pending front-desk items (owner put these on hold on 6 Oct 2026; build only when asked):**
+    - **Guest and company history:** look up a person or company and see past stays and unpaid balances.
+    - **Companies list:** pick from saved companies instead of typing, so "Seatech" and "Sea Tech" do not become two companies in reports (a `companies` table plus `guests.company_id`).
+    - **Shift handover note** on the dashboard for the next receptionist.
+    - **Discounts:** needs the owner's decision on whether they are allowed and who may give them (open question 18).
+3. **Admin extras** still parked: admin calendar (reuse `pages/reception/calendar.tsx`), a read-only front-desk overview for the Admin, clean-up of old activity log entries and alerts.
+4. **SMS alerts:** need a paid SMS provider; email alerts are built.
 5. **Go-live setup:** Windows Task Scheduler entry for `php artisan schedule:run` (section 5), the company's SMTP server, a real web server instead of `php artisan serve`.
 
 ---

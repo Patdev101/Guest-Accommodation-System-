@@ -136,7 +136,25 @@ class Stay extends Model
     {
         $charged = (float) $this->charges()->sum('amount');
 
-        return round($charged - (float) $this->allPayments()->sum('amount'), 2);
+        return round($charged - (float) $this->allPayments()->sum('amount') + $this->refundedOverpayment(), 2);
+    }
+
+    /** @return HasMany<Refund, $this> */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    /** Money given back (or on its way back) because the stay was paid more than its bill. */
+    public function refundedOverpayment(): float
+    {
+        return (float) $this->refunds()->sum('amount');
+    }
+
+    /** Paid more than the final bill, and not yet refunded: 0 when nothing is owed back. */
+    public function overpaid(): float
+    {
+        return max(0, -$this->balance());
     }
 
     /**

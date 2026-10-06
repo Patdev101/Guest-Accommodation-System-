@@ -4,11 +4,13 @@ import {
     ArrowLeftRight,
     CalendarPlus,
     CheckCircle2,
+    Clock,
     IdCard,
     ImageIcon,
     LogOut,
     Phone,
     Plus,
+    Printer,
     SearchCheck,
     Trash2,
 } from 'lucide-react';
@@ -16,6 +18,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import ChargeController from '@/actions/App/Http/Controllers/Reception/ChargeController';
 import StayController from '@/actions/App/Http/Controllers/Reception/StayController';
+import StayToolsController from '@/actions/App/Http/Controllers/Reception/StayToolsController';
 import { ConfirmAction, ConfirmDelete } from '@/components/confirm-dialog';
 import { IconButton } from '@/components/icon-button';
 import { Page, PageHeader } from '@/components/page';
@@ -34,6 +37,11 @@ import type {
     ExtensionItem,
     StayRoomItem,
 } from '@/components/reception/stay-dialogs';
+import {
+    LateFeeDialog,
+    MoveRoomDialog,
+} from '@/components/reception/stay-tools';
+import type { MoveRoomOption } from '@/components/reception/stay-tools';
 import { RoomStatusBadge } from '@/components/room-status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -119,6 +127,15 @@ type Props = {
         company_paid: string;
         guest_charged: string;
         guest_paid: string;
+        refunded: string;
+    };
+    tools: {
+        overpaid: string;
+        can_refund_overpayment: boolean;
+        minutes_late: number;
+        late_text: string;
+        late_fee: string;
+        move_rooms: MoveRoomOption[];
     };
     extensions: ExtensionItem[];
     reminders: {
@@ -148,6 +165,8 @@ type Dialog =
     | 'charge'
     | 'pay'
     | 'return_id'
+    | 'late_fee'
+    | 'refund_overpayment'
     | null;
 
 const partyLabel: Record<BilledTo, string> = {
@@ -167,7 +186,9 @@ export default function StayPage(props: Props) {
         extensions,
         reminders,
         can,
+        tools,
     } = props;
+    const [moving, setMoving] = useState<StayRoomItem | null>(null);
     const [dialog, setDialog] = useState<Dialog>(null);
     const [inspecting, setInspecting] = useState<StayRoomItem | null>(null);
     const [deciding, setDeciding] = useState<ExtensionItem | null>(null);
@@ -207,39 +228,54 @@ export default function StayPage(props: Props) {
                         </>
                     }
                     actions={
-                        can.check_out && (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setDialog('call')}
+                        <>
+                            {/* A plain page for printing; not an in-app visit. */}
+                            <Button variant="outline" asChild>
+                                <a
+                                    href={StayToolsController.bill.url(stay.id)}
+                                    target="_blank"
+                                    rel="noreferrer"
                                 >
-                                    <Phone />
-                                    Log call
-                                </Button>
-                                {can.confirm_not_extending && (
+                                    <Printer />
+                                    Print bill
+                                </a>
+                            </Button>
+                            {can.check_out && (
+                                <>
                                     <Button
                                         variant="outline"
-                                        onClick={() =>
-                                            setDialog('not_extending')
-                                        }
+                                        onClick={() => setDialog('call')}
                                     >
-                                        <CheckCircle2 />
-                                        Not extending
+                                        <Phone />
+                                        Log call
                                     </Button>
-                                )}
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setDialog('extend')}
-                                >
-                                    <CalendarPlus />
-                                    Extend stay
-                                </Button>
-                                <Button onClick={() => setDialog('check_out')}>
-                                    <LogOut />
-                                    Check out
-                                </Button>
-                            </>
-                        )
+                                    {can.confirm_not_extending && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() =>
+                                                setDialog('not_extending')
+                                            }
+                                        >
+                                            <CheckCircle2 />
+                                            Not extending
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setDialog('extend')}
+                                    >
+                                        <CalendarPlus />
+                                        Extend stay
+                                    </Button>
+                                    <Button
+                                        onClick={() => setDialog('check_out')}
+                                    >
+                                        <LogOut />
+                                        Check out
+                                    </Button>
+                                </>
+                            )}
+                        </>
                     }
                 />
 
@@ -248,6 +284,24 @@ export default function StayPage(props: Props) {
                         The expected check-out (
                         {formatDateTime(stay.expected_check_out_at)}) has
                         passed. Check the guests out, or extend the stay.
+                    </Notice>
+                )}
+
+                {tools.can_refund_overpayment && (
+                    <Notice>
+                        <span className="flex flex-wrap items-center justify-between gap-3">
+                            <span>
+                                This stay was paid {formatPeso(tools.overpaid)}{' '}
+                                more than its final bill.
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDialog('refund_overpayment')}
+                            >
+                                Refund {formatPeso(tools.overpaid)}
+                            </Button>
+                        </span>
                     </Notice>
                 )}
 
@@ -313,6 +367,18 @@ export default function StayPage(props: Props) {
                                                 group={room.group}
                                                 label={room.status_label}
                                             />
+                                            {can.check_out && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setMoving(room)
+                                                    }
+                                                >
+                                                    <ArrowLeftRight />
+                                                    Change room
+                                                </Button>
+                                            )}
                                             {stay.checked_out_at &&
                                                 !room.inspected_at && (
                                                     <Button
@@ -342,14 +408,28 @@ export default function StayPage(props: Props) {
                                     </CardDescription>
                                 </div>
                                 {can.change_bill && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setDialog('charge')}
-                                    >
-                                        <Plus />
-                                        Add charge
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2">
+                                        {tools.minutes_late > 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setDialog('late_fee')
+                                                }
+                                            >
+                                                <Clock />
+                                                Late check-out fee
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setDialog('charge')}
+                                        >
+                                            <Plus />
+                                            Add charge
+                                        </Button>
+                                    </div>
                                 )}
                             </CardHeader>
                             <CardContent className="space-y-5">
@@ -479,6 +559,16 @@ export default function StayPage(props: Props) {
                                     <dd className="tabular-nums sm:text-right">
                                         {formatPeso(bill.paid)}
                                     </dd>
+                                    {Number(bill.refunded) > 0 && (
+                                        <>
+                                            <dt className="text-muted-foreground">
+                                                Overpayment refunded
+                                            </dt>
+                                            <dd className="tabular-nums sm:text-right">
+                                                {formatPeso(bill.refunded)}
+                                            </dd>
+                                        </>
+                                    )}
                                     <dt className="font-medium">
                                         {balance >= 0 ? 'Balance' : 'Overpaid'}
                                     </dt>
@@ -845,6 +935,29 @@ export default function StayPage(props: Props) {
                     confirmLabel="Remove"
                 />
             )}
+            <ConfirmAction
+                open={dialog === 'refund_overpayment'}
+                onOpenChange={(open) => !open && close()}
+                title={`Refund ${formatPeso(tools.overpaid)} to ${stay.contact_name}?`}
+                description="The stay was paid more than its final bill. This requests the refund; record how it was given back on the Refunds page."
+                url={StayToolsController.refundOverpayment.url(stay.id)}
+                method="post"
+                confirmLabel="Request refund"
+            />
+            <LateFeeDialog
+                stayId={stay.id}
+                open={dialog === 'late_fee'}
+                lateText={tools.late_text}
+                suggested={tools.late_fee}
+                defaultBilledTo={stay.default_billed_to}
+                onClose={close}
+            />
+            <MoveRoomDialog
+                stayId={stay.id}
+                room={moving}
+                options={tools.move_rooms}
+                onClose={() => setMoving(null)}
+            />
             <CallDialog
                 stay={dialog === 'call' ? stay : null}
                 onClose={close}

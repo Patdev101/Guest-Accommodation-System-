@@ -19,6 +19,7 @@ use App\Models\Refund;
 use App\Models\Reservation;
 use App\Models\ReservationRoom;
 use App\Models\Room;
+use App\Models\RoomInclusion;
 use App\Models\RoomRate;
 use App\Models\Setting;
 use App\Models\StayGuest;
@@ -139,7 +140,7 @@ class ReservationController extends Controller
 
         // Every room, so the page can filter by location without asking again.
         $rooms = Room::query()
-            ->with(['location:id,name', 'coverPhoto', 'rates' => fn ($rates) => $rates->where('is_extension_rate', false)->with('unit:id,name')->orderBy('price')])
+            ->with(['location:id,name', 'coverPhoto', 'inclusions', 'rates' => fn ($rates) => $rates->where('is_extension_rate', false)->with('unit:id,name')->orderBy('price')])
             ->get()
             ->sortBy(fn (Room $room) => $room->location->name."\0".$room->name, SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
@@ -156,6 +157,8 @@ class ReservationController extends Controller
             return [
                 ...$room->summary(),
                 'blocked_reason' => $blocked,
+                // e.g. "2 Beds", "Aircon": what the Admin listed for the room.
+                'inclusions' => $room->inclusions->map(fn (RoomInclusion $inclusion) => $inclusion->quantity > 1 ? $inclusion->quantity.' '.$inclusion->item : $inclusion->item)->values(),
                 'rates' => $room->rates->map(fn (RoomRate $rate) => [
                     'id' => $rate->id,
                     'name' => $rate->name,
@@ -190,7 +193,7 @@ class ReservationController extends Controller
             ],
             'locations' => Location::query()->orderBy('name')->get(['id', 'name']),
             'guestTypes' => array_map(fn (GuestType $type) => ['value' => $type->value, 'label' => $type->label()], GuestType::cases()),
-            'paymentMethods' => Payment::METHODS,
+            'paymentMethods' => Payment::methods(),
             'standardTimes' => ['check_in' => $checkIn, 'check_out' => $checkOut],
             'walkIn' => $walkIn,
             // Filled when an existing reservation is being changed.
@@ -432,7 +435,7 @@ class ReservationController extends Controller
                 'cancel' => $reservation->isActive(),
                 'no_show' => $reservation->isActive() && now()->gte($noShowFrom),
             ],
-            'paymentMethods' => Payment::METHODS,
+            'paymentMethods' => Payment::methods(),
             'noShowRefund' => $this->noShowRefundPercent(),
         ]);
     }

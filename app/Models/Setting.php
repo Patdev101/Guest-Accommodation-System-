@@ -21,6 +21,14 @@ class Setting extends Model
         // What "Overnight" and a standard stay mean (24-hour HH:MM).
         'standard_check_in_time' => '14:00',
         'standard_check_out_time' => '12:00',
+        // How money can be received at the front desk (comma-separated; the Admin edits the list).
+        'payment_methods' => 'Cash, GCash, Maya, Bank transfer, Card, Other',
+        // 1 = urgent front-desk alerts are also emailed to reception.
+        'alert_emails' => '0',
+        // Days to keep an ID photo after the ID is returned; 0 = keep.
+        'id_photo_retention_days' => '0',
+        // Backups kept on the server; older ones are deleted.
+        'backups_to_keep' => '7',
     ];
 
     protected $primaryKey = 'key';
@@ -43,6 +51,10 @@ class Setting extends Model
         'no_show_refund_percent' => 'No-show refund percentage',
         'standard_check_in_time' => 'Standard check-in time',
         'standard_check_out_time' => 'Standard check-out time',
+        'payment_methods' => 'Payment methods',
+        'alert_emails' => 'Email urgent alerts to reception',
+        'id_photo_retention_days' => 'Days to keep ID photos after return',
+        'backups_to_keep' => 'Backups to keep',
     ];
 
     public static function set(string $key, ?string $value): void

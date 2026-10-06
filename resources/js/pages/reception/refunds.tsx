@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { Page, PageHeader } from '@/components/page';
 import { Pager } from '@/components/pager';
 import { RefundStatusBadge } from '@/components/reception/badges';
+import { RefundedDialog } from '@/components/reception/stay-tools';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -21,11 +22,15 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatDateTime, formatPeso, plural } from '@/lib/format';
 import { index as refundsIndex } from '@/routes/reception/refunds';
 import { show as reservationsShow } from '@/routes/reception/reservations';
+import { show as staysShow } from '@/routes/reception/stays';
 import type { Paginated, RefundStatus } from '@/types';
 
 type Refund = {
     id: number;
     reservation_id: number | null;
+    stay_id: number | null;
+    method: string | null;
+    reference: string | null;
     guest: string | null;
     contact_number: string | null;
     amount: string;
@@ -46,6 +51,7 @@ type Props = {
     show: 'open' | 'refunded' | 'all';
     openTotal: string;
     openCount: number;
+    methods: string[];
 };
 
 const views = [
@@ -59,6 +65,7 @@ export default function Refunds({
     show,
     openTotal,
     openCount,
+    methods,
 }: Props) {
     const [advancing, setAdvancing] = useState<Refund | null>(null);
 
@@ -71,7 +78,7 @@ export default function Refunds({
                     description={
                         openCount > 0
                             ? `${formatPeso(openTotal)} to give back across ${plural(openCount, 'refund')}. Each goes Requested → Processing → Refunded.`
-                            : 'Money owed back after cancellations and no-shows. Nothing to process right now.'
+                            : 'Money owed back after cancellations, no-shows and overpaid bills. Nothing to process right now.'
                     }
                 />
 
@@ -139,7 +146,16 @@ export default function Refunds({
                                 {refunds.data.map((refund) => (
                                     <TableRow key={refund.id}>
                                         <TableCell className="pl-4">
-                                            {refund.reservation_id ? (
+                                            {refund.stay_id ? (
+                                                <Link
+                                                    href={staysShow(
+                                                        refund.stay_id,
+                                                    )}
+                                                    className="font-medium underline-offset-4 hover:underline"
+                                                >
+                                                    {refund.guest}
+                                                </Link>
+                                            ) : refund.reservation_id ? (
                                                 <Link
                                                     href={reservationsShow(
                                                         refund.reservation_id,
@@ -193,6 +209,10 @@ export default function Refunds({
                                                     {formatDateTime(
                                                         refund.refunded_at,
                                                     )}
+                                                    {refund.method &&
+                                                        ` · ${refund.method}`}
+                                                    {refund.reference &&
+                                                        ` · ref. ${refund.reference}`}
                                                 </div>
                                             )}
                                         </TableCell>
@@ -227,29 +247,23 @@ export default function Refunds({
                 <Pager page={refunds} />
             </Page>
 
-            {advancing && (
+            {advancing?.status === 'requested' && (
                 <ConfirmAction
                     open
                     onOpenChange={(open) => !open && setAdvancing(null)}
-                    title={
-                        advancing.status === 'requested'
-                            ? `Start processing ${formatPeso(advancing.amount)}?`
-                            : `Mark ${formatPeso(advancing.amount)} as refunded?`
-                    }
-                    description={
-                        advancing.status === 'requested'
-                            ? `Records that you are now handling the refund to ${advancing.guest}.`
-                            : `Only once ${advancing.guest} has the money back. This cannot be undone.`
-                    }
+                    title={`Start processing ${formatPeso(advancing.amount)}?`}
+                    description={`Records that you are now handling the refund to ${advancing.guest}.`}
                     url={RefundController.advance.url(advancing.id)}
                     method="patch"
-                    confirmLabel={
-                        advancing.status === 'requested'
-                            ? 'Start processing'
-                            : 'Mark refunded'
-                    }
+                    confirmLabel="Start processing"
                 />
             )}
+            {/* Giving the money back also records how it went. */}
+            <RefundedDialog
+                refund={advancing?.status === 'processing' ? advancing : null}
+                methods={methods}
+                onClose={() => setAdvancing(null)}
+            />
         </>
     );
 }

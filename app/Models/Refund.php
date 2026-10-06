@@ -13,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int|null $reservation_id
+ * @property int|null $stay_id Set for an overpayment refund on a stay
  * @property int|null $payment_id
+ * @property string|null $method How the money went back
+ * @property string|null $reference Reference number of the transfer, if any
  * @property string $amount
  * @property string $reason
  * @property RefundStatus $status
@@ -30,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read User|null $refunder
  */
 #[Fillable([
-    'reservation_id', 'payment_id', 'amount', 'reason', 'status',
+    'reservation_id', 'stay_id', 'payment_id', 'amount', 'reason', 'status', 'method', 'reference',
     'requested_by', 'requested_at', 'processed_by', 'processing_at', 'refunded_by', 'refunded_at',
 ])]
 class Refund extends Model
@@ -39,7 +42,9 @@ class Refund extends Model
 
     public function activityLabel(): string
     {
-        return 'refund of ₱'.number_format((float) $this->amount, 2)." for reservation #{$this->reservation_id}";
+        return 'refund of ₱'.number_format((float) $this->amount, 2).($this->stay_id !== null
+            ? " (overpayment) for stay #{$this->stay_id}"
+            : " for reservation #{$this->reservation_id}");
     }
 
     /**
@@ -67,6 +72,12 @@ class Refund extends Model
     public function reservation(): BelongsTo
     {
         return $this->belongsTo(Reservation::class);
+    }
+
+    /** @return BelongsTo<Stay, $this> */
+    public function stay(): BelongsTo
+    {
+        return $this->belongsTo(Stay::class);
     }
 
     /** @return BelongsTo<Payment, $this> */

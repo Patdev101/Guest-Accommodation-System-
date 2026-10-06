@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * In-app alerts (rules 17, 18 and 27). Front-desk alerts go to reception;
@@ -51,7 +52,7 @@ class FrontDeskAlerts
     /** @return int How many alerts were sent. */
     public function run(): int
     {
-        return $this->checkOutCalls() + $this->notArrived() + $this->arrivingSoon();
+        return $this->checkOutCalls() + $this->notArrived() + $this->arrivingSoon() + $this->roomClashes();
     }
 
     /** Rule 18: from the reminder time before check-out, call the guest. */
@@ -139,6 +140,48 @@ class FrontDeskAlerts
                 __(':rooms · :guests. Make sure the rooms are ready.', [
                     'rooms' => $this->roomNames($reservation->rooms),
                     'guests' => $this->guests((int) $reservation->rooms->sum('pax')),
+                ]),
+                route('reception.reservations.show', $reservation),
+            )));
+        }
+
+        return $sent;
+    }
+
+    /**
+     * A guest arrives within the hour (or is already due) and their room still
+     * has the previous guest in it: reception must check out or move someone.
+     */
+    private function roomClashes(): int
+    {
+        $now = CarbonImmutable::now();
+        $sent = 0;
+
+        $reservations = Reservation::query()
+            ->with(['guest:id,name', 'rooms'])
+            ->where('status', ReservationStatus::Active)
+            ->where('starts_at', '<=', $now->addMinutes(self::ARRIVAL_NOTICE_MINUTES))
+            ->where('starts_at', '>', $now->subDays(2))
+            ->get();
+
+        foreach ($reservations as $reservation) {
+            $occupied = StayRoom::query()
+                ->whereIn('room_id', $reservation->rooms->pluck('room_id'))
+                ->whereHas('stay', fn ($query) => $query->whereNull('checked_out_at'))
+                ->with(['room:id,name', 'stay.guest:id,name'])
+                ->get();
+
+            if ($occupied->isEmpty()) {
+                continue;
+            }
+
+            $sent += (int) $this->once("clash:{$reservation->id}:{$reservation->starts_at->timestamp}", fn () => $this->toDesk(new FrontDeskAlert(
+                'room_clash',
+                __(':rooms still occupied, next guest due', ['rooms' => $this->roomNames($occupied)]),
+                __(':next arrives at :time, but :current has not checked out. Check them out, or give the new guest another room.', [
+                    'next' => $reservation->guest->name,
+                    'time' => $reservation->starts_at->format('g:i A'),
+                    'current' => $occupied->map(fn (StayRoom $line) => $line->stay->guest->name)->unique()->implode(', '),
                 ]),
                 route('reception.reservations.show', $reservation),
             )));
@@ -314,6 +357,17 @@ class FrontDeskAlerts
         $others = $by === null ? $users : $users->reject(fn (User $user) => $user->is($by));
 
         Notification::send($others, $alert);
+
+        // Urgent alerts also go by email when the Admin switched that on, so they
+        // reach reception even when nobody has the app open. A mail problem must
+        // never stop the front desk's work.
+        if ($alert->isUrgent() && Setting::get('alert_emails') === '1') {
+            try {
+                Notification::send($others, $alert->byMail());
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
 
         if ($by !== null && $others->count() < $users->count()) {
             $copy = clone $alert;

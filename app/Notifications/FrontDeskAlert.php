@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -13,7 +14,10 @@ class FrontDeskAlert extends Notification
     use Queueable;
 
     /** Alerts for reception. */
-    public const DESK_KINDS = ['checkout_call', 'not_arrived', 'arriving', 'booked', 'changed', 'cancelled', 'room_ready', 'extension_waiting', 'extension'];
+    public const DESK_KINDS = ['checkout_call', 'not_arrived', 'arriving', 'room_clash', 'booked', 'changed', 'cancelled', 'room_ready', 'extension_waiting', 'extension'];
+
+    /** Alerts that need action now; these can also be emailed (setting alert_emails). */
+    public const URGENT_KINDS = ['checkout_call', 'not_arrived', 'room_clash', 'extension_waiting'];
 
     /** Alerts for the Admin. */
     public const ADMIN_KINDS = ['repair'];
@@ -30,7 +34,33 @@ class FrontDeskAlert extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return $this->mail ? ['mail'] : ['database'];
+    }
+
+    /** True for a copy that is emailed instead of shown under the bell. */
+    private bool $mail = false;
+
+    public function isUrgent(): bool
+    {
+        return in_array($this->kind, self::URGENT_KINDS, true);
+    }
+
+    /** The same alert as an email. */
+    public function byMail(): static
+    {
+        $copy = clone $this;
+        $copy->mail = true;
+
+        return $copy;
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject($this->title)
+            ->line($this->body)
+            ->action(__('Open in the system'), $this->url)
+            ->line(__('You get this email because urgent front-desk alerts are switched on.'));
     }
 
     /**

@@ -24,7 +24,7 @@ class ReservationPaymentController extends Controller
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:'.$balance],
-            'method' => ['required', Rule::in(Payment::METHODS)],
+            'method' => ['required', Rule::in(Payment::methods())],
             'paid_by' => ['required', Rule::enum(BilledTo::class)],
             'receipt_number' => ['nullable', 'string', 'max:100'],
         ], ['amount.max' => __('The balance is only :amount.', ['amount' => number_format($balance, 2)])]);

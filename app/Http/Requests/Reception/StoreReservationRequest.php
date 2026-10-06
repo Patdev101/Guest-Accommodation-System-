@@ -53,7 +53,7 @@ class StoreReservationRequest extends FormRequest
             'guests' => ['nullable', 'integer', 'min:1', 'max:1000'],
 
             'payment_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
-            'payment_method' => ['nullable', Rule::in(Payment::METHODS)],
+            'payment_method' => ['nullable', Rule::in(Payment::methods())],
             'paid_by' => ['nullable', Rule::enum(BilledTo::class)],
             'receipt_number' => ['nullable', 'string', 'max:100'],
 

@@ -49,6 +49,7 @@ type Tone = 'act' | 'info' | 'done' | 'quiet' | 'repair';
 const kinds: Record<string, { icon: LucideIcon; tone: Tone }> = {
     checkout_call: { icon: Phone, tone: 'act' },
     not_arrived: { icon: UserX, tone: 'act' },
+    room_clash: { icon: UserX, tone: 'act' },
     extension_waiting: { icon: ArrowRightLeft, tone: 'act' },
     arriving: { icon: CalendarClock, tone: 'info' },
     booked: { icon: BookmarkPlus, tone: 'info' },

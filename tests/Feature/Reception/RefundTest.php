@@ -36,10 +36,12 @@ class RefundTest extends TestCase
         $this->assertSame(RefundStatus::Processing, $refund->status);
         $this->assertSame($desk->id, $refund->processed_by);
 
-        $this->actingAs($desk)->patch(route('reception.refunds.advance', $refund));
+        // Giving the money back records how it went.
+        $this->actingAs($desk)->patch(route('reception.refunds.advance', $refund), ['method' => 'Cash']);
         $refund->refresh();
         $this->assertSame(RefundStatus::Refunded, $refund->status);
         $this->assertNotNull($refund->refunded_at);
+        $this->assertSame('Cash', $refund->method);
 
         $this->actingAs($desk)->patch(route('reception.refunds.advance', $refund));
         $this->assertSame(RefundStatus::Refunded, $refund->refresh()->status);

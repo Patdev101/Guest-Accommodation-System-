@@ -4,7 +4,9 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\IdTypeController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\MaintenanceRecordController;
+use App\Http\Controllers\Admin\OptionsController;
 use App\Http\Controllers\Admin\RateUnitController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\Admin\RoomCopyController;
 use App\Http\Controllers\Admin\RoomInclusionController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\Reception\ReservationPaymentController;
 use App\Http\Controllers\Reception\RoomStatusController as ReceptionRoomStatusController;
 use App\Http\Controllers\Reception\StayController;
 use App\Http\Controllers\Reception\StayPaymentController;
+use App\Http\Controllers\Reception\StayToolsController;
 use Illuminate\Support\Facades\Route;
 
 // Admin-only phase: the home address goes straight to the dashboard (or the
@@ -72,6 +75,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('charges/{charge}', [ChargeController::class, 'destroy'])->name('charges.destroy');
         Route::post('stays/{stay}/payments', [StayPaymentController::class, 'store'])->name('stays.payments.store');
         Route::patch('stays/{stay}/not-extending', [StayController::class, 'notExtending'])->name('stays.not-extending');
+        Route::get('stays/{stay}/bill', [StayToolsController::class, 'bill'])->name('stays.bill');
+        Route::post('stays/{stay}/rooms/{stayRoom}/move', [StayToolsController::class, 'moveRoom'])->name('stays.rooms.move');
+        Route::post('stays/{stay}/late-fee', [StayToolsController::class, 'lateFee'])->name('stays.late-fee');
+        Route::post('stays/{stay}/refund-overpayment', [StayToolsController::class, 'refundOverpayment'])->name('stays.refund-overpayment');
         Route::post('stays/{stay}/extensions', [ExtensionController::class, 'store'])->name('stays.extensions.store');
         Route::patch('extensions/{extension}/decide', [ExtensionController::class, 'decide'])->name('extensions.decide');
         Route::post('stays/{stay}/reminders', [ReminderController::class, 'store'])->name('stays.reminders.store');
@@ -120,6 +127,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('users/{user}/activate', [UserController::class, 'activate'])->name('users.activate');
 
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
+
+        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+
+        Route::get('options', [OptionsController::class, 'edit'])->name('options.edit');
+        Route::put('options', [OptionsController::class, 'update'])->name('options.update');
+        Route::post('options/id-photos/delete', [OptionsController::class, 'deletePhotos'])->name('options.id-photos.delete');
+        Route::post('options/backups', [OptionsController::class, 'backup'])->middleware('throttle:6,1')->name('options.backups.store');
+        Route::get('options/backups/{backup}', [OptionsController::class, 'download'])->name('options.backups.show');
+        Route::delete('options/backups/{backup}', [OptionsController::class, 'destroyBackup'])->name('options.backups.destroy');
     });
 });
 

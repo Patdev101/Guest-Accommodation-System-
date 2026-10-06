@@ -17,6 +17,8 @@ import type { BoardLocation } from '@/components/admin/room-board';
 import { SetupChecklist } from '@/components/admin/setup-checklist';
 import type { Checklist } from '@/components/admin/setup-checklist';
 import { StatTile } from '@/components/admin/stat-tile';
+import { Trends } from '@/components/admin/trends';
+import type { TrendData } from '@/components/admin/trends';
 import { EmptyState } from '@/components/empty-state';
 import { Page, PageHeader } from '@/components/page';
 import { StatusDot } from '@/components/room-status-badge';
@@ -56,6 +58,7 @@ type Props = {
     board: BoardLocation[];
     checklist: Checklist;
     recentMaintenance: MaintenanceItem[];
+    trends: TrendData;
 };
 
 export default function AdminDashboard({
@@ -65,6 +68,7 @@ export default function AdminDashboard({
     board,
     checklist,
     recentMaintenance,
+    trends,
 }: Props) {
     const { auth } = usePage().props;
     const firstName = auth.user.name.split(' ')[0];
@@ -333,6 +337,8 @@ export default function AdminDashboard({
                         </div>
                     </>
                 )}
+
+                {stats.rooms > 0 && <Trends trends={trends} />}
             </Page>
         </>
     );

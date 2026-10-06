@@ -48,6 +48,7 @@ import {
     formatClock,
     formatDayTime,
     formatMinutes,
+    formatPeso,
     formatTime,
     formatToday,
     formatWhen,
@@ -80,6 +81,17 @@ type BoardRoom = BoardRoomSummary &
     RoomOccupancy & {
         transitions: Transition[];
         upcoming_reservations: number;
+        description: string | null;
+        rates: {
+            id: number;
+            name: string;
+            unit: string;
+            price: string;
+            is_extension: boolean;
+        }[];
+        inclusions: { id: number; item: string; quantity: number }[];
+        company: string | null;
+        guest_names: string[];
     };
 
 type Props = {
@@ -140,6 +152,10 @@ export default function FrontDesk({
     // Keep the day's picture current without a manual refresh.
     usePoll(60_000);
 
+    // Rooms where the next guest is due today but the last guest is still in.
+    const clashes = board
+        .flatMap((item) => item.rooms)
+        .filter((room) => room.stay && room.arrival);
     const lateIds = new Set(overdue.map((row) => row.id));
     const expected = arrivals.filter((row) => !lateIds.has(row.id));
 
@@ -279,7 +295,8 @@ export default function FrontDesk({
                             <LiveBadge />
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            {dueSoon.length === 0 &&
+                            {clashes.length === 0 &&
+                            dueSoon.length === 0 &&
                             overdue.length === 0 &&
                             expected.length === 0 &&
                             toInspect.length === 0 ? (
@@ -291,6 +308,47 @@ export default function FrontDesk({
                                 />
                             ) : (
                                 <>
+                                    <FeedSection
+                                        title="Room still occupied, next guest due"
+                                        hint="Check the current guest out, or give the new guest another room."
+                                        rows={clashes}
+                                    >
+                                        {(room) => (
+                                            <FeedItem
+                                                key={room.id}
+                                                accent="bg-destructive"
+                                                action={
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setPicking(room)
+                                                        }
+                                                    >
+                                                        Open room
+                                                    </Button>
+                                                }
+                                            >
+                                                <p className="font-medium">
+                                                    {room.name}
+                                                </p>
+                                                <FeedLine>
+                                                    In: {room.stay?.guest}
+                                                    {room.stay?.overdue &&
+                                                        ' (past check-out)'}
+                                                </FeedLine>
+                                                <FeedLine>
+                                                    Next: {room.arrival?.guest},{' '}
+                                                    {room.arrival &&
+                                                        formatWhen(
+                                                            room.arrival
+                                                                .starts_at,
+                                                        )}
+                                                </FeedLine>
+                                            </FeedItem>
+                                        )}
+                                    </FeedSection>
+
                                     <FeedSection
                                         title="Call before check-out"
                                         rows={dueSoon}
@@ -478,8 +536,9 @@ export default function FrontDesk({
                             <div className="space-y-1.5">
                                 <CardTitle>Rooms</CardTitle>
                                 <CardDescription>
-                                    Click a room to see who is in it, check a
-                                    guest in or change its status.
+                                    Click a room to see its prices, inclusions
+                                    and who is in it, check a guest in or change
+                                    its status.
                                 </CardDescription>
                             </div>
                             {board.length > 1 && (
@@ -802,7 +861,7 @@ function HouseRules({ rules }: { rules: Props['rules'] }) {
     );
 }
 
-/** Everything about one room: who is in it, who comes next, its status. */
+/** Everything about one room: who is in it, who comes next, its prices and inclusions (read-only), its status. */
 function RoomDialog({
     room,
     onClose,
@@ -817,7 +876,7 @@ function RoomDialog({
             open={room !== null}
             onOpenChange={(open) => !open && onClose()}
         >
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 {room && (
                     <>
                         <DialogHeader>
@@ -832,6 +891,14 @@ function RoomDialog({
                                 {room.location} · sleeps {room.pax_capacity}
                             </DialogDescription>
                         </DialogHeader>
+
+                        {room.cover_url && (
+                            <img
+                                src={room.cover_url}
+                                alt={`Photo of ${room.name}`}
+                                className="h-40 w-full rounded-lg object-cover"
+                            />
+                        )}
 
                         {room.stay && (
                             <RoomFact
@@ -858,6 +925,18 @@ function RoomDialog({
                                     {room.stay.not_extending &&
                                         ' · not extending'}
                                 </p>
+                                {room.company && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {room.company}
+                                    </p>
+                                )}
+                                {room.guest_names.length > 0 && (
+                                    <ul className="mt-2 list-inside list-disc text-xs">
+                                        {room.guest_names.map((name, index) => (
+                                            <li key={index}>{name}</li>
+                                        ))}
+                                    </ul>
+                                )}
                             </RoomFact>
                         )}
 
@@ -899,6 +978,68 @@ function RoomDialog({
                                 Nobody is in this room or arriving today.
                             </p>
                         )}
+
+                        <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-medium">Prices</h3>
+                                {room.rates.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No price set yet. Ask the Admin to add
+                                        one.
+                                    </p>
+                                ) : (
+                                    <ul className="space-y-1.5 text-sm">
+                                        {room.rates.map((rate) => (
+                                            <li
+                                                key={rate.id}
+                                                className="flex items-baseline justify-between gap-3"
+                                            >
+                                                <span className="min-w-0">
+                                                    {rate.name}
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        {rate.unit}
+                                                        {rate.is_extension &&
+                                                            ' · for extending a stay'}
+                                                    </span>
+                                                </span>
+                                                <span className="font-medium tabular-nums">
+                                                    {formatPeso(rate.price)}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-medium">
+                                    Inclusions
+                                </h3>
+                                {room.inclusions.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        None listed.
+                                    </p>
+                                ) : (
+                                    <ul className="space-y-1.5 text-sm">
+                                        {room.inclusions.map((inclusion) => (
+                                            <li
+                                                key={inclusion.id}
+                                                className="flex justify-between gap-3"
+                                            >
+                                                <span>{inclusion.item}</span>
+                                                <span className="text-muted-foreground tabular-nums">
+                                                    × {inclusion.quantity}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                            {room.description && (
+                                <p className="text-sm text-muted-foreground sm:col-span-2">
+                                    {room.description}
+                                </p>
+                            )}
+                        </div>
 
                         <div className="space-y-2 border-t pt-4">
                             <h3 className="text-sm font-medium">

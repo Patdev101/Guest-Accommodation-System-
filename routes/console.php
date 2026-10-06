@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 // Front-desk alerts (rules 17, 18 and 27). Needs `php artisan schedule:run`
 // every minute (Windows Task Scheduler) or `php artisan schedule:work`.
 Schedule::command('front-desk:alerts')->everyMinute()->withoutOverlapping();
+
+// Every night: delete ID photos past their retention period and write a backup.
+Schedule::command('housekeeping:run --backup')->dailyAt('02:00')->withoutOverlapping();

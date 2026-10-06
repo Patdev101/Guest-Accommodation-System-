@@ -20,6 +20,7 @@ use App\Models\Room;
 use App\Models\Stay;
 use App\Models\StayGuest;
 use App\Models\StayRoom;
+use App\Services\Availability;
 use App\Services\StayExtension;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -177,7 +178,16 @@ class StayController extends Controller
                 'return_id' => $custody !== null && $custody->status !== IdCustodyStatus::Returned,
                 'return_id_blocker' => $stay->idReturnBlocker(),
             ],
-            'paymentMethods' => Payment::METHODS,
+            'paymentMethods' => Payment::methods(),
+            // Late fee, overpayment and room change (StayToolsController).
+            'tools' => [
+                'overpaid' => number_format($stay->overpaid(), 2, '.', ''),
+                'can_refund_overpayment' => $stay->isCheckedOut() && $stay->allRoomsInspected() && $stay->overpaid() > 0,
+                'minutes_late' => StayToolsController::minutesLate($stay),
+                'late_text' => StayToolsController::duration(max(1, StayToolsController::minutesLate($stay))),
+                'late_fee' => number_format(StayToolsController::suggestedLateFee($stay, $stay->rooms), 2, '.', ''),
+                'move_rooms' => $stay->isCheckedOut() ? [] : $this->roomsToMoveTo($stay),
+            ],
             // Filled when the Extend dialog asks: who is in the way, and where they could go.
             'extensionCheck' => fn () => is_string($extendTo) ? $this->extensionCheck($stay, $extendTo, $extensions) : null,
         ]);
@@ -334,6 +344,7 @@ class StayController extends Controller
      */
     private function bill(Stay $stay, $payments): array
     {
+        $refunded = $stay->refundedOverpayment();
         $charged = fn (?BilledTo $to) => (float) $stay->charges->when($to, fn ($charges) => $charges->where('billed_to', $to))->sum('amount');
         $paid = fn (?BilledTo $to) => (float) $payments->when($to, fn ($list) => $list->where('paid_by', $to))->sum('amount');
         $money = fn (float $value) => number_format($value, 2, '.', '');
@@ -341,7 +352,9 @@ class StayController extends Controller
         return [
             'charged' => $money($charged(null)),
             'paid' => $money($paid(null)),
-            'balance' => $money($charged(null) - $paid(null)),
+            // An overpayment that is being given back no longer counts as paid.
+            'balance' => $money($charged(null) - $paid(null) + $refunded),
+            'refunded' => $money($refunded),
             'company_charged' => $money($charged(BilledTo::Company)),
             'company_paid' => $money($paid(BilledTo::Company)),
             'guest_charged' => $money($charged(BilledTo::Guest)),
@@ -349,6 +362,32 @@ class StayController extends Controller
             'extensions' => $money((float) $stay->charges->where('type', ChargeType::Extension)->sum('amount')),
             'pending_extensions' => (string) $stay->extensions->where('status', ExtensionStatus::PendingConsent)->count(),
         ];
+    }
+
+    /**
+     * Available rooms the guests could move to now, free until the expected check-out.
+     *
+     * @return list<array{id: int, name: string, location: string, pax_capacity: int}>
+     */
+    private function roomsToMoveTo(Stay $stay): array
+    {
+        $availability = app(Availability::class);
+        $now = CarbonImmutable::now();
+        $until = $stay->expected_check_out_at->max($now->addMinute());
+
+        return array_values(Room::query()
+            ->with('location:id,name')
+            ->where('status', RoomStatus::Available)
+            ->get()
+            ->filter(fn (Room $room) => $availability->blockedReason($room, $now, $until) === null)
+            ->sortBy(fn (Room $room) => $room->location->name."\0".$room->name, SORT_NATURAL | SORT_FLAG_CASE)
+            ->map(fn (Room $room) => [
+                'id' => $room->id,
+                'name' => $room->name,
+                'location' => $room->location->name,
+                'pax_capacity' => $room->pax_capacity,
+            ])
+            ->all());
     }
 
     /**

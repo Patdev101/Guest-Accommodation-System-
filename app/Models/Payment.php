@@ -32,8 +32,18 @@ class Payment extends Model
 {
     use CastsKeysToIntegers, LogsActivity;
 
-    /** How money can be received at the front desk. */
-    public const METHODS = ['Cash', 'GCash', 'Maya', 'Bank transfer', 'Card', 'Other'];
+    /**
+     * How money can be received (and refunded) at the front desk. The Admin
+     * manages the list in Options; old payments keep whatever method they had.
+     *
+     * @return list<string>
+     */
+    public static function methods(): array
+    {
+        $names = array_map('trim', explode(',', (string) Setting::get('payment_methods')));
+
+        return array_values(array_unique(array_filter($names, fn (string $name) => $name !== '')));
+    }
 
     public function activityLabel(): string
     {
