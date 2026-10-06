@@ -56,6 +56,8 @@ class ReportsAndOptionsTest extends TestCase
                 ->where('income.by_method.0.method', 'GCash')
                 ->where('unpaid.0.company', 'Seatech Welding')
                 ->where('unpaid.0.balance', 2000)
+                ->where('unpaid.0.bills.0.stay_id', $stay->id)
+                ->where('unpaid.0.bills.0.guest', 'Jose Bautista')
                 ->where('idsHeld.0.guest', 'Jose Bautista')
                 ->where('occupancy.rooms', 2)
                 // One of two rooms, occupied for 5 of the 9.4 days so far: 5 / 18.75.

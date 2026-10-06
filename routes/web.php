@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\GuestAccountController;
 use App\Http\Controllers\Admin\IdTypeController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\MaintenanceRecordController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Reception\CheckInController;
 use App\Http\Controllers\Reception\ExtensionController;
 use App\Http\Controllers\Reception\IdPhotoController;
 use App\Http\Controllers\Reception\InspectionController;
+use App\Http\Controllers\Reception\PendingController;
 use App\Http\Controllers\Reception\RefundController;
 use App\Http\Controllers\Reception\ReminderController;
 use App\Http\Controllers\Reception\ReservationController;
@@ -84,6 +86,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('stays/{stay}/reminders', [ReminderController::class, 'store'])->name('stays.reminders.store');
         Route::patch('rooms/{room}/status', ReceptionRoomStatusController::class)->name('rooms.status.update');
 
+        Route::get('pending', PendingController::class)->name('pending');
+
         Route::get('refunds', [RefundController::class, 'index'])->name('refunds.index');
         Route::patch('refunds/{refund}/advance', [RefundController::class, 'advance'])->name('refunds.advance');
     });
@@ -125,6 +129,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('users.reset-link');
         Route::patch('users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
         Route::patch('users/{user}/activate', [UserController::class, 'activate'])->name('users.activate');
+
+        Route::get('guest-accounts', [GuestAccountController::class, 'index'])->name('guest-accounts.index');
 
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
 

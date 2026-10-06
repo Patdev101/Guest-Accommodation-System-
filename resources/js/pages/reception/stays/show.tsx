@@ -6,11 +6,9 @@ import {
     CheckCircle2,
     Clock,
     IdCard,
-    ImageIcon,
     LogOut,
     Phone,
     Plus,
-    Printer,
     SearchCheck,
     Trash2,
 } from 'lucide-react';
@@ -42,6 +40,7 @@ import {
     MoveRoomDialog,
 } from '@/components/reception/stay-tools';
 import type { MoveRoomOption } from '@/components/reception/stay-tools';
+import { BillButton, IdPhotoButton } from '@/components/reception/viewers';
 import { RoomStatusBadge } from '@/components/room-status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -229,17 +228,10 @@ export default function StayPage(props: Props) {
                     }
                     actions={
                         <>
-                            {/* A plain page for printing; not an in-app visit. */}
-                            <Button variant="outline" asChild>
-                                <a
-                                    href={StayToolsController.bill.url(stay.id)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                >
-                                    <Printer />
-                                    Print bill
-                                </a>
-                            </Button>
+                            <BillButton
+                                stayId={stay.id}
+                                guest={stay.contact_name}
+                            />
                             {can.check_out && (
                                 <>
                                     <Button
@@ -867,21 +859,10 @@ export default function StayPage(props: Props) {
                                             </Detail>
                                         )}
                                         {id.photo_url && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                asChild
-                                                className="w-fit"
-                                            >
-                                                <a
-                                                    href={id.photo_url}
-                                                    target="_blank"
-                                                    rel="noopener"
-                                                >
-                                                    <ImageIcon />
-                                                    View ID photo
-                                                </a>
-                                            </Button>
+                                            <IdPhotoButton
+                                                url={id.photo_url}
+                                                guest={stay.contact_name}
+                                            />
                                         )}
                                         {can.return_id &&
                                             can.return_id_blocker && (

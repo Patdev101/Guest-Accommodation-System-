@@ -29,6 +29,8 @@ class Setting extends Model
         'id_photo_retention_days' => '0',
         // Backups kept on the server; older ones are deleted.
         'backups_to_keep' => '7',
+        // Hours an online booking request holds its rooms while it waits for Reception.
+        'booking_request_hold_hours' => '24',
     ];
 
     protected $primaryKey = 'key';

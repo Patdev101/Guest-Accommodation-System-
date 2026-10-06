@@ -29,7 +29,9 @@ class UserController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('admin/users', [
+            // Staff only: guest accounts have their own page (GuestAccountController).
             'users' => User::query()
+                ->where('role', '!=', Role::Guest)
                 ->orderByRaw('case when deactivated_at is null then 0 else 1 end')
                 ->orderByRaw("case role when 'admin' then 0 when 'reception' then 1 else 2 end")
                 ->orderBy('name')
@@ -135,7 +137,13 @@ class UserController extends Controller
             ? ['type' => 'success', 'message' => $message]
             : ['type' => 'error', 'message' => __($status)]);
 
-        return to_route('admin.users.index');
+        return $this->backToList($user);
+    }
+
+    /** Guests are listed on their own page, staff on the Users page. */
+    private function backToList(User $user): RedirectResponse
+    {
+        return $user->role === Role::Guest ? back(fallback: route('admin.guest-accounts.index')) : to_route('admin.users.index');
     }
 
     public function deactivate(Request $request, User $user): RedirectResponse
@@ -152,7 +160,7 @@ class UserController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __(':name can no longer log in.', ['name' => $user->name])]);
 
-        return to_route('admin.users.index');
+        return $this->backToList($user);
     }
 
     public function activate(User $user): RedirectResponse
@@ -161,6 +169,6 @@ class UserController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __(':name can log in again.', ['name' => $user->name])]);
 
-        return to_route('admin.users.index');
+        return $this->backToList($user);
     }
 }

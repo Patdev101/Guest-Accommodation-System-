@@ -49,6 +49,7 @@ class StayToolsController extends Controller
             'refunded' => $refunded,
             'balance' => round($charged - $paid + $refunded, 2),
             'printedBy' => request()->user()->name,
+            'embed' => request()->boolean('embed'),
         ]);
     }
 

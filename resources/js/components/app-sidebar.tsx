@@ -8,9 +8,11 @@ import {
     DatabaseBackup,
     HandCoins,
     History,
+    IdCard,
     LayoutGrid,
     MapPin,
     Settings2,
+    UserRound,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -27,13 +29,14 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as activityIndex } from '@/routes/admin/activity';
+import { index as guestAccountsIndex } from '@/routes/admin/guest-accounts';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as roomsIndex } from '@/routes/admin/rooms';
 import { edit as settingsEdit } from '@/routes/admin/settings';
 import { index as usersIndex } from '@/routes/admin/users';
 import { edit as optionsEdit } from '@/routes/admin/options';
 import { index as reportsIndex } from '@/routes/admin/reports';
-import { calendar } from '@/routes/reception';
+import { calendar, pending } from '@/routes/reception';
 import { index as refundsIndex } from '@/routes/reception/refunds';
 import { index as reservationsIndex } from '@/routes/reception/reservations';
 import { index as staysIndex } from '@/routes/reception/stays';
@@ -50,8 +53,8 @@ const sections: NavSection[] = [
     },
     {
         label: 'Front desk',
-        // Hidden from admins for now (owner, 2 Oct 2026); add 'admin' back to show it.
-        roles: ['reception'],
+        // The Admin can do everything Reception can (owner, 6 Oct 2026).
+        roles: ['reception', 'admin'],
         items: [
             {
                 title: 'Reservations',
@@ -66,6 +69,7 @@ const sections: NavSection[] = [
                 icon: BedSingle,
                 matchChildren: true,
             },
+            { title: 'Unpaid and IDs held', href: pending(), icon: IdCard },
             { title: 'Refunds', href: refundsIndex(), icon: HandCoins },
         ],
     },
@@ -98,6 +102,11 @@ const sections: NavSection[] = [
         roles: ['admin'],
         items: [
             { title: 'Users', href: usersIndex(), icon: Users },
+            {
+                title: 'Guest accounts',
+                href: guestAccountsIndex(),
+                icon: UserRound,
+            },
             { title: 'Activity log', href: activityIndex(), icon: History },
         ],
     },

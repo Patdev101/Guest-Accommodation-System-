@@ -180,6 +180,35 @@ class StayToolsTest extends TestCase
             && $alert->toMail($this->desk)->subject === 'Call Jose Bautista before check-out');
     }
 
+    public function test_unpaid_bills_and_held_ids_are_listed_for_reception_and_the_admin()
+    {
+        $this->charge(1000);
+        $this->pay(400);
+        $pending = fn (User $user, array $query = []) => $this->actingAs($user)->get(route('reception.pending', $query));
+
+        // Still in house: only on the wider list.
+        $pending($this->desk)->assertInertia(fn ($page) => $page->component('reception/pending')->has('rows', 0));
+        $pending($this->desk, ['show' => 'all'])->assertInertia(fn ($page) => $page->has('rows', 1));
+
+        $this->stay->update(['checked_out_at' => now(), 'checked_out_by' => $this->desk->id]);
+
+        $pending(User::factory()->admin()->create())
+            ->assertInertia(fn ($page) => $page
+                ->has('rows', 1)
+                ->where('rows.0.id', $this->stay->id)
+                ->where('rows.0.owes', 600)
+                ->where('totals.owed', 600)
+                ->where('totals.unpaid', 1));
+
+        // Fully paid and no ID held: off the list.
+        $this->pay(600);
+        $this->stay->idCustody()->delete();
+        $pending($this->desk)->assertInertia(fn ($page) => $page->has('rows', 0)->where('totals.owed', 0));
+
+        $pending(User::factory()->create())->assertForbidden();
+        $this->actingAs($this->desk)->get(route('reception.stays.bill', [$this->stay, 'embed' => 1]))->assertOk()->assertDontSee('Back to the stay');
+    }
+
     public function test_the_stay_page_offers_the_tools()
     {
         $this->travelTo(Carbon::parse('2026-10-01 13:30'));

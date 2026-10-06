@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Download, Printer } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { formatDate, formatDateTime, formatPeso, plural } from '@/lib/format';
 import { index as reportsIndex } from '@/routes/admin/reports';
+import { show as staysShow } from '@/routes/reception/stays';
 
 type Props = {
     from: string;
@@ -57,6 +58,7 @@ type Props = {
         stays: number;
         balance: number;
         oldest: string;
+        bills: { stay_id: number; guest: string; balance: number }[];
     }[];
     occupancy: {
         rooms: number;
@@ -320,8 +322,34 @@ export default function Reports({
                         <TableBody>
                             {unpaid.map((row) => (
                                 <TableRow key={row.company}>
-                                    <TableCell className="font-medium">
-                                        {row.company}
+                                    <TableCell>
+                                        {row.bills.length === 1 ? (
+                                            <StayLink id={row.bills[0].stay_id}>
+                                                {row.company}
+                                            </StayLink>
+                                        ) : (
+                                            <>
+                                                <span className="font-medium">
+                                                    {row.company}
+                                                </span>
+                                                {row.bills.map((bill) => (
+                                                    <span
+                                                        key={bill.stay_id}
+                                                        className="block text-xs text-muted-foreground"
+                                                    >
+                                                        <StayLink
+                                                            id={bill.stay_id}
+                                                        >
+                                                            {bill.guest}
+                                                        </StayLink>{' '}
+                                                        owes{' '}
+                                                        {formatPeso(
+                                                            bill.balance,
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums">
                                         {row.stays}
@@ -359,9 +387,9 @@ export default function Reports({
                             {idsHeld.map((row) => (
                                 <TableRow key={row.stay_id}>
                                     <TableCell>
-                                        <span className="font-medium">
+                                        <StayLink id={row.stay_id}>
                                             {row.guest}
-                                        </span>
+                                        </StayLink>
                                         <span className="block text-xs text-muted-foreground">
                                             {row.company ?? '—'}
                                         </span>
@@ -413,9 +441,9 @@ export default function Reports({
                             {guestLog.map((row) => (
                                 <TableRow key={row.stay_id}>
                                     <TableCell>
-                                        <span className="font-medium">
+                                        <StayLink id={row.stay_id}>
                                             {row.guest}
-                                        </span>
+                                        </StayLink>
                                         <span className="block text-xs text-muted-foreground">
                                             {row.company ?? '—'} ·{' '}
                                             {row.contact_number}
@@ -445,6 +473,18 @@ export default function Reports({
                 </Report>
             </Page>
         </>
+    );
+}
+
+/** Opens the stay, where the bill, payments and ID are handled. */
+function StayLink({ id, children }: { id: number; children: ReactNode }) {
+    return (
+        <Link
+            href={staysShow(id)}
+            className="font-medium underline-offset-4 hover:underline"
+        >
+            {children}
+        </Link>
     );
 }
 

@@ -34,13 +34,16 @@
         }
     </style>
 </head>
-<body>
-    <div class="bar">
-        <button type="button" class="primary" onclick="window.print()">Print or save as PDF</button>
-        <a class="btn" href="{{ route('reception.stays.show', $stay) }}">Back to the stay</a>
-    </div>
+<body @if ($embed) style="background: #fff; padding: 0;" @endif>
+    {{-- Inside the pop-up the page around it has the buttons. --}}
+    @unless ($embed)
+        <div class="bar">
+            <button type="button" class="primary" onclick="window.print()">Print or save as PDF</button>
+            <a class="btn" href="{{ route('reception.stays.show', $stay) }}">Back to the stay</a>
+        </div>
+    @endunless
 
-    <div class="sheet">
+    <div class="sheet" @if ($embed) style="border: 0;" @endif>
         <header>
             <div>
                 <h1>Mindoro Marine Manufacturing Corporation</h1>

@@ -80,7 +80,7 @@ class Reports
     /**
      * Stays that still owe money, grouped by company (all dates).
      *
-     * @return list<array{company: string, stays: int, balance: float, oldest: string}>
+     * @return list<array{company: string, stays: int, balance: float, oldest: string, bills: list<array{stay_id: int, guest: string, balance: float}>}>
      */
     public function unpaid(): array
     {
@@ -98,7 +98,10 @@ class Reports
                 'stays' => $rows->count(),
                 'balance' => round((float) $rows->sum('balance'), 2),
                 'oldest' => $rows->min(fn (array $row) => $row['stay']->checked_in_at)->toIso8601String(),
-                'stay_ids' => $rows->map(fn (array $row) => $row['stay']->id)->values()->all(),
+                'bills' => array_values($rows
+                    ->sortByDesc('balance')
+                    ->map(fn (array $row) => ['stay_id' => $row['stay']->id, 'guest' => $row['stay']->guest->name, 'balance' => $row['balance']])
+                    ->all()),
             ])
             ->sortByDesc('balance')
             ->values()

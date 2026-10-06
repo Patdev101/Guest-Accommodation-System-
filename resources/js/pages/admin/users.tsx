@@ -84,7 +84,7 @@ export default function Users({ users, roles }: Props) {
             <Page>
                 <PageHeader
                     title="Users"
-                    description="Create Reception and Admin accounts here. Each person sets their own password from an emailed link."
+                    description="Staff accounts: Reception and Admin. Each person sets their own password from an emailed link."
                     actions={
                         <Button onClick={() => setCreating(true)}>
                             <UserPlus />

@@ -85,6 +85,38 @@ class UserManagementTest extends TestCase
         $this->assertSame(Role::Reception, $desk->refresh()->role);
     }
 
+    public function test_guest_accounts_have_their_own_page_apart_from_staff()
+    {
+        $admin = User::factory()->admin()->create();
+        $desk = User::factory()->reception()->create();
+        $guest = User::factory()->create(['name' => 'Ana Guest', 'email' => 'ana@example.com']);
+        User::factory()->create(['name' => 'Ben Guest', 'deactivated_at' => now()]);
+
+        // The Users page lists staff only.
+        $this->actingAs($admin)->get(route('admin.users.index'))
+            ->assertInertia(fn ($page) => $page->has('users', 2)->where('users.0.role', 'admin')->where('users.1.role', 'reception'));
+
+        $this->actingAs($admin)->get(route('admin.guest-accounts.index'))
+            ->assertInertia(fn ($page) => $page
+                ->component('admin/guest-accounts')
+                ->has('accounts.data', 2)
+                ->where('accounts.data.0.email', 'ana@example.com')
+                ->where('totals.all', 2)
+                ->where('totals.deactivated', 1));
+
+        $this->actingAs($admin)->get(route('admin.guest-accounts.index', ['show' => 'deactivated', 'search' => 'ben']))
+            ->assertInertia(fn ($page) => $page->has('accounts.data', 1)->where('accounts.data.0.name', 'Ben Guest'));
+
+        // Deactivating and reactivating a guest returns to the guest page.
+        $list = route('admin.guest-accounts.index', ['show' => 'active']);
+        $this->actingAs($admin)->from($list)->patch(route('admin.users.deactivate', $guest))->assertRedirect($list);
+        $this->assertFalse($guest->refresh()->isActive());
+        $this->actingAs($admin)->from(route('dashboard'))->patch(route('admin.users.activate', $guest))->assertRedirect(route('dashboard'));
+        $this->assertTrue($guest->refresh()->isActive());
+
+        $this->actingAs($desk)->get(route('admin.guest-accounts.index'))->assertForbidden();
+    }
+
     public function test_admin_cannot_remove_their_own_admin_role()
     {
         $admin = User::factory()->admin()->create();

@@ -3,7 +3,6 @@ import {
     ArrowRight,
     Ban,
     IdCard,
-    ImageIcon,
     LogIn,
     Pencil,
     Plus,
@@ -17,6 +16,7 @@ import ReservationPaymentController from '@/actions/App/Http/Controllers/Recepti
 import { ConfirmAction } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form-field';
 import { Page, PageHeader } from '@/components/page';
+import { IdPhotoButton } from '@/components/reception/viewers';
 import {
     PaymentStatusBadge,
     RefundStatusBadge,
@@ -747,16 +747,10 @@ function StayCard({ stay }: { stay: Stay }) {
                             </Detail>
                         </dl>
                         {stay.id.photo_url ? (
-                            <Button variant="outline" size="sm" asChild>
-                                <a
-                                    href={stay.id.photo_url}
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    <ImageIcon />
-                                    View ID photo
-                                </a>
-                            </Button>
+                            <IdPhotoButton
+                                url={stay.id.photo_url}
+                                guest="the contact person"
+                            />
                         ) : (
                             <p className="text-xs text-muted-foreground">
                                 No photo (recorded before photos were required).
