@@ -1,137 +1,129 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { Page, PageHeader } from '@/components/page';
-import { StatusDot } from '@/components/room-status-badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { formatDateTime, plural } from '@/lib/format';
+    ChevronLeft,
+    ChevronRight,
+    LogIn,
+    LogOut,
+    Plus,
+    X,
+} from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { FormField } from '@/components/form-field';
+import { Page, PageHeader } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { formatDate, formatTime, plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { calendar } from '@/routes/reception';
 import { create as reservationsCreate } from '@/routes/reception/reservations';
-import type { RoomSummary } from '@/types';
 
-type Booking = {
-    kind: 'reserved' | 'not_arrived' | 'in_house' | 'checked_out';
+type CalendarEvent = {
+    type: 'arrival' | 'departure';
     label: string;
+    guest: string;
     company: string | null;
-    pax: number;
-    starts_at: string;
-    ends_at: string;
-    open_ended: boolean;
+    rooms: string;
+    at: string;
+    status: string;
     href: string;
 };
 
 type Props = {
-    now: string;
-    start: string;
+    /** True when a "from … to" range was asked for; false for a whole month. */
+    ranged: boolean;
     from: string;
-    until: string;
-    days: string[];
+    to: string;
+    title: string;
+    previous: string;
+    next: string;
     today: string;
-    standardTimes: { check_in: string; check_out: string };
-    locations: {
-        id: number;
-        name: string;
-        rooms: (RoomSummary & { bookings: Booking[] })[];
-    }[];
+    events: Record<string, CalendarEvent[]>;
+    arrivals: number;
+    departures: number;
 };
 
-const dayLabel = new Intl.DateTimeFormat('en-PH', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-});
+const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function utcDate(date: string): Date {
+// Arrivals are blue, check-outs amber, the same in the boxes and the keys.
+const tone = {
+    arrival:
+        'border-l-sky-600 bg-sky-50 text-sky-950 dark:bg-sky-950/40 dark:text-sky-100',
+    departure:
+        'border-l-amber-500 bg-amber-50 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100',
+};
+
+/** How many events a day box shows before "+ more". */
+const SHOWN = 3;
+
+/** "2026-10-07" moved by a number of days (no time zones involved). */
+function shift(date: string, days: number): string {
     const [year, month, day] = date.split('-').map(Number);
 
-    return new Date(Date.UTC(year, month - 1, day));
+    return new Date(Date.UTC(year, month - 1, day + days))
+        .toISOString()
+        .slice(0, 10);
 }
 
-function shiftDays(date: string, days: number): string {
-    const next = utcDate(date);
-    next.setUTCDate(next.getUTCDate() + days);
+function weekday(date: string): number {
+    const [year, month, day] = date.split('-').map(Number);
 
-    return next.toISOString().slice(0, 10);
+    return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
-
-/**
- * One colour per kind, each with a strong left edge and dark text on a light
- * fill so the name stays readable. In house uses the room board's "In use"
- * orange, so the same colour means the same thing on both screens.
- */
-const barStyle: Record<Booking['kind'], string> = {
-    reserved:
-        'border border-l-4 border-violet-300 border-l-violet-600 bg-violet-100 text-violet-950 dark:border-violet-800 dark:border-l-violet-400 dark:bg-violet-950 dark:text-violet-100',
-    not_arrived:
-        'border border-l-4 border-dashed border-red-400 border-l-red-600 bg-red-50 text-red-950 dark:border-red-800 dark:border-l-red-400 dark:bg-red-950 dark:text-red-100',
-    in_house:
-        'border border-l-4 border-room-in-use/50 border-l-room-in-use bg-room-in-use/20 text-foreground',
-    checked_out:
-        'border border-l-4 border-slate-300 border-l-slate-400 bg-slate-100 text-slate-600 dark:border-slate-700 dark:border-l-slate-500 dark:bg-slate-900 dark:text-slate-400',
-};
-
-const kindLabel: Record<Booking['kind'], string> = {
-    reserved: 'Reserved',
-    not_arrived: 'Not arrived',
-    in_house: 'In house',
-    checked_out: 'Checked out',
-};
-
-const kindHint: Record<Booking['kind'], string> = {
-    reserved: 'booked, guests not here yet',
-    not_arrived: 'late, past the grace period',
-    in_house: 'guests are in the room now',
-    checked_out: 'guests have left',
-};
-
-/** "May extend": the stay may go on, so the time after is kept free for now. */
-const extendStyle = {
-    backgroundImage:
-        'repeating-linear-gradient(135deg, color-mix(in oklab, var(--room-in-use) 30%, transparent) 0 4px, transparent 4px 9px)',
-};
-
-/** Bars narrower than this (share of the week, about 12 hours) show no text. */
-const LABEL_MIN_WIDTH = 7;
 
 export default function Calendar({
-    now,
-    start,
+    ranged,
     from,
-    until,
-    days,
+    to,
+    title,
+    previous,
+    next,
     today,
-    standardTimes,
-    locations,
+    events,
+    arrivals,
+    departures,
 }: Props) {
-    const windowStart = Date.parse(from);
-    const windowLength = Date.parse(until) - windowStart;
+    const [picked, setPicked] = useState<string | null>(null);
+    const [range, setRange] = useState({ from, to });
+    const [shownRange, setShownRange] = useState(`${from}|${to}`);
 
-    /** Where a time sits across the week, 0–100%. */
-    const position = (iso: string) =>
-        Math.min(
-            100,
-            Math.max(0, ((Date.parse(iso) - windowStart) / windowLength) * 100),
-        );
+    // Follow the dates the server answered with (Previous, Next, Today).
+    if (shownRange !== `${from}|${to}`) {
+        setShownRange(`${from}|${to}`);
+        setRange({ from, to });
+    }
 
-    const nowAt = Date.parse(now);
-    const nowShown =
-        nowAt >= windowStart && nowAt <= windowStart + windowLength;
-    const nowLeft = position(now);
+    const inRange = (date: string) => date >= from && date <= to;
+    const selected = picked !== null && inRange(picked) ? picked : null;
 
-    const go = (date: string | null) =>
-        router.get(calendar().url, date ? { start: date } : {}, {
-            preserveScroll: true,
-        });
+    const go = (query: Record<string, string>) =>
+        router.get(calendar().url, query, { preserveScroll: true });
 
-    // A literal class, so Tailwind generates it: room name + 7 days.
-    const columns = 'grid-cols-[9rem_repeat(7,minmax(0,1fr))]';
+    const showRange = (event: FormEvent) => {
+        event.preventDefault();
+        go(range);
+    };
+
+    // Whole weeks, Sunday to Saturday, that cover the dates shown.
+    const start = shift(from, -weekday(from));
+    const end = shift(to, 6 - weekday(to));
+    const dates: string[] = [];
+
+    for (let date = start; date <= end; date = shift(date, 1)) {
+        dates.push(date);
+    }
+
+    const schedule = selected ? (events[selected] ?? []) : [];
 
     return (
         <>
@@ -139,305 +131,290 @@ export default function Calendar({
             <Page>
                 <PageHeader
                     title="Calendar"
-                    description="A week of every room. Click a free day to book it; click a bar to open the booking."
+                    description="See who is arriving or checking out, their room, status and scheduled time."
                     actions={
-                        <>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                aria-label="Previous week"
-                                onClick={() => go(shiftDays(start, -7))}
-                            >
-                                <ChevronLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => go(null)}
-                                disabled={start === today}
-                            >
-                                Today
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                aria-label="Next week"
-                                onClick={() => go(shiftDays(start, 7))}
-                            >
-                                <ChevronRight />
-                            </Button>
-                            <Button asChild>
-                                <Link href={reservationsCreate()}>
-                                    <Plus />
-                                    New reservation
-                                </Link>
-                            </Button>
-                        </>
+                        <Button asChild>
+                            <Link href={reservationsCreate()}>
+                                <Plus />
+                                New reservation
+                            </Link>
+                        </Button>
                     }
                 />
 
-                <Card className="gap-0 px-5 py-4">
-                    <h2 className="sr-only">What the colours mean</h2>
-                    <ul className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                        {(Object.keys(kindLabel) as Booking['kind'][]).map(
-                            (kind) => (
-                                <li
-                                    key={kind}
-                                    className="flex items-center gap-3"
+                <Card className="gap-5 p-4 md:p-6">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                        <div className="space-y-3">
+                            <h2 className="text-xl font-semibold tracking-tight">
+                                {title}
+                            </h2>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => go({ month: previous })}
                                 >
-                                    <span
-                                        aria-hidden
-                                        className={cn(
-                                            'inline-block h-5 w-10 shrink-0 rounded-md',
-                                            barStyle[kind],
-                                        )}
-                                    />
-                                    <span>
-                                        <span className="font-medium">
-                                            {kindLabel[kind]}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                            {' '}
-                                            – {kindHint[kind]}
-                                        </span>
-                                    </span>
-                                </li>
-                            ),
-                        )}
-                        <li className="flex items-center gap-3">
-                            <span
-                                aria-hidden
-                                className="inline-block h-5 w-10 shrink-0 rounded-md border border-dashed border-room-in-use"
-                                style={extendStyle}
-                            />
-                            <span>
-                                <span className="font-medium">May extend</span>
-                                <span className="text-muted-foreground">
-                                    {' '}
-                                    – kept free until the guest confirms
-                                </span>
-                            </span>
-                        </li>
-                        <li className="flex items-center gap-3">
-                            <span
-                                aria-hidden
-                                className="flex h-5 w-10 shrink-0 justify-center"
-                            >
-                                <span className="h-full w-0.5 rounded-full bg-red-500" />
-                            </span>
-                            <span>
-                                <span className="font-medium">Now</span>
-                                <span className="text-muted-foreground">
-                                    {' '}
-                                    – the current time
-                                </span>
-                            </span>
-                        </li>
-                    </ul>
-                </Card>
+                                    <ChevronLeft />
+                                    Previous month
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => go({})}
+                                >
+                                    Today
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => go({ month: next })}
+                                >
+                                    Next month
+                                    <ChevronRight />
+                                </Button>
+                            </div>
+                        </div>
 
-                {locations.map((location) => (
-                    <Card key={location.id} className="gap-0 py-0">
-                        <CardHeader className="border-b py-4">
-                            <CardTitle className="text-base">
-                                {location.name}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="overflow-x-auto p-0">
-                            <div className="min-w-[52rem]">
+                        <form
+                            onSubmit={showRange}
+                            className="flex flex-wrap items-end gap-2"
+                        >
+                            <FormField label="From" htmlFor="calendar_from">
+                                <Input
+                                    id="calendar_from"
+                                    type="date"
+                                    value={range.from}
+                                    max={range.to}
+                                    onChange={(event) =>
+                                        setRange({
+                                            ...range,
+                                            from: event.target.value,
+                                        })
+                                    }
+                                    required
+                                />
+                            </FormField>
+                            <FormField label="To" htmlFor="calendar_to">
+                                <Input
+                                    id="calendar_to"
+                                    type="date"
+                                    value={range.to}
+                                    min={range.from}
+                                    onChange={(event) =>
+                                        setRange({
+                                            ...range,
+                                            to: event.target.value,
+                                        })
+                                    }
+                                    required
+                                />
+                            </FormField>
+                            <Button type="submit">Show dates</Button>
+                            {ranged && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => go({})}
+                                >
+                                    <X />
+                                    Clear
+                                </Button>
+                            )}
+                        </form>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span
+                            className={cn(
+                                'inline-flex items-center gap-2 rounded-md border-l-4 px-3 py-1.5',
+                                tone.arrival,
+                            )}
+                        >
+                            <LogIn className="size-4" />
+                            Arrivals / reservations
+                            <b className="text-base">{arrivals}</b>
+                        </span>
+                        <span
+                            className={cn(
+                                'inline-flex items-center gap-2 rounded-md border-l-4 px-3 py-1.5',
+                                tone.departure,
+                            )}
+                        >
+                            <LogOut className="size-4" />
+                            Expected check-outs
+                            <b className="text-base">{departures}</b>
+                        </span>
+                        <span className="text-muted-foreground">
+                            Click a day to see everything on it.
+                        </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <div className="grid min-w-[46rem] grid-cols-7 overflow-hidden rounded-lg border-t border-l">
+                            {weekdays.map((day) => (
                                 <div
-                                    className={cn(
-                                        'grid border-b bg-muted/40 text-xs',
-                                        columns,
-                                    )}
+                                    key={day}
+                                    className="border-r border-b bg-muted/60 px-2 py-2.5 text-center text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                 >
-                                    <div className="px-3 py-2 font-medium text-muted-foreground">
-                                        Room
-                                    </div>
-                                    {days.map((day) => (
-                                        <div
-                                            key={day}
-                                            className={cn(
-                                                'border-l px-2 py-2 font-medium',
-                                                day === today
-                                                    ? 'text-foreground'
-                                                    : 'text-muted-foreground',
-                                            )}
-                                        >
-                                            {dayLabel.format(utcDate(day))}
-                                            {day === today && (
-                                                <span className="ml-1.5 rounded bg-primary px-1 py-px text-[10px] text-primary-foreground">
-                                                    Today
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
+                                    {day}
                                 </div>
+                            ))}
 
-                                {location.rooms.length === 0 && (
-                                    <p className="px-3 py-4 text-sm text-muted-foreground">
-                                        No rooms here yet.
-                                    </p>
-                                )}
+                            {dates.map((date) => {
+                                // Days outside the dates asked for are left blank.
+                                if (!inRange(date)) {
+                                    return (
+                                        <div
+                                            key={date}
+                                            className="min-h-32 border-r border-b bg-muted/30"
+                                        />
+                                    );
+                                }
 
-                                {location.rooms.map((room) => (
+                                const list = events[date] ?? [];
+                                const day = Number(date.slice(8));
+
+                                return (
                                     <div
-                                        key={room.id}
+                                        key={date}
                                         className={cn(
-                                            'grid border-b last:border-b-0',
-                                            columns,
+                                            'min-h-32 border-r border-b p-1.5',
+                                            date === today &&
+                                                'bg-sky-50/60 dark:bg-sky-950/20',
+                                            date === selected &&
+                                                'ring-2 ring-ring ring-inset',
                                         )}
                                     >
-                                        <div className="px-3 py-2">
-                                            <p className="truncate text-sm font-medium">
-                                                {room.name}
-                                            </p>
-                                            <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                                                <StatusDot group={room.group} />
-                                                <span className="truncate">
-                                                    {room.status_label} ·{' '}
-                                                    {room.pax_capacity} pax
+                                        <button
+                                            type="button"
+                                            onClick={() => setPicked(date)}
+                                            aria-pressed={date === selected}
+                                            aria-label={`${formatDate(date)}, ${plural(list.length, 'activity', 'activities')}`}
+                                            className="flex w-full items-center justify-between rounded px-1 py-0.5 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'text-sm font-semibold',
+                                                    date === today &&
+                                                        'rounded-full bg-primary px-2 text-primary-foreground',
+                                                )}
+                                            >
+                                                {/* A range can cross months: say which one on its first day. */}
+                                                {day === 1 || date === from
+                                                    ? formatDate(date).replace(
+                                                          /,? \d{4}$/,
+                                                          '',
+                                                      )
+                                                    : day}
+                                            </span>
+                                            {list.length > 0 && (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    {plural(
+                                                        list.length,
+                                                        'activity',
+                                                        'activities',
+                                                    )}
                                                 </span>
-                                            </p>
-                                        </div>
-                                        <div className="relative col-span-7 min-h-14">
-                                            <div className="absolute inset-0 grid grid-cols-7">
-                                                {days.map((day) => (
-                                                    <Link
-                                                        key={day}
-                                                        href={reservationsCreate(
-                                                            {
-                                                                query: {
-                                                                    starts_at: `${day}T${standardTimes.check_in}`,
-                                                                    ends_at: `${shiftDays(day, 1)}T${standardTimes.check_out}`,
-                                                                    location:
-                                                                        location.id,
-                                                                },
-                                                            },
-                                                        )}
-                                                        aria-label={`Book ${room.name} from ${dayLabel.format(utcDate(day))}`}
-                                                        className={cn(
-                                                            'border-l transition-colors hover:bg-accent/60 focus-visible:bg-accent focus-visible:outline-none',
-                                                            day === today &&
-                                                                'bg-primary/5',
-                                                        )}
-                                                    />
-                                                ))}
-                                            </div>
-
-                                            {room.bookings.map(
-                                                (booking, index) => {
-                                                    const left = position(
-                                                        booking.starts_at,
-                                                    );
-                                                    const right = position(
-                                                        booking.ends_at,
-                                                    );
-                                                    const name =
-                                                        booking.company &&
-                                                        booking.company !==
-                                                            booking.label
-                                                            ? `${booking.label} · ${booking.company}`
-                                                            : booking.label;
-
-                                                    return (
-                                                        <div key={index}>
-                                                            {booking.open_ended &&
-                                                                right < 100 && (
-                                                                    <div
-                                                                        aria-hidden
-                                                                        className="pointer-events-none absolute top-2 bottom-2 rounded-r-md border border-l-0 border-dashed border-room-in-use"
-                                                                        style={{
-                                                                            ...extendStyle,
-                                                                            left: `${right}%`,
-                                                                            width: `${100 - right}%`,
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            {right > left && (
-                                                                <Tooltip>
-                                                                    <TooltipTrigger
-                                                                        asChild
-                                                                    >
-                                                                        <Link
-                                                                            href={
-                                                                                booking.href
-                                                                            }
-                                                                            aria-label={`${kindLabel[booking.kind]}: ${name}`}
-                                                                            className={cn(
-                                                                                'absolute top-2 bottom-2 flex min-w-2 items-center overflow-hidden rounded-md px-2 text-xs font-medium shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                                                                                barStyle[
-                                                                                    booking
-                                                                                        .kind
-                                                                                ],
-                                                                            )}
-                                                                            style={{
-                                                                                left: `${left}%`,
-                                                                                width: `${right - left}%`,
-                                                                            }}
-                                                                        >
-                                                                            {right -
-                                                                                left >=
-                                                                                LABEL_MIN_WIDTH && (
-                                                                                <span className="truncate">
-                                                                                    {booking.kind ===
-                                                                                        'not_arrived' &&
-                                                                                        'Late · '}
-                                                                                    {
-                                                                                        name
-                                                                                    }
-                                                                                </span>
-                                                                            )}
-                                                                        </Link>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        {
-                                                                            kindLabel[
-                                                                                booking
-                                                                                    .kind
-                                                                            ]
-                                                                        }
-                                                                        : {name}
-                                                                        ,{' '}
-                                                                        {plural(
-                                                                            booking.pax,
-                                                                            'guest',
-                                                                        )}
-                                                                        <br />
-                                                                        {formatDateTime(
-                                                                            booking.starts_at,
-                                                                        )}{' '}
-                                                                        to{' '}
-                                                                        {formatDateTime(
-                                                                            booking.ends_at,
-                                                                        )}
-                                                                        {booking.open_ended &&
-                                                                            ' · may extend'}
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                },
                                             )}
+                                        </button>
 
-                                            {nowShown && (
-                                                <span
-                                                    aria-hidden
-                                                    className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-red-500"
-                                                    style={{
-                                                        left: `${nowLeft}%`,
-                                                    }}
-                                                />
-                                            )}
-                                        </div>
+                                        {list.slice(0, SHOWN).map((event) => (
+                                            <EventCard
+                                                key={`${event.type}-${event.href}`}
+                                                event={event}
+                                                compact
+                                            />
+                                        ))}
+                                        {list.length > SHOWN && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPicked(date)}
+                                                className="mt-1 w-full rounded border border-dashed px-2 py-1 text-left text-xs font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                            >
+                                                + {list.length - SHOWN} more,
+                                                view all
+                                            </button>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+                                );
+                            })}
+                        </div>
+                    </div>
+                </Card>
             </Page>
+
+            {/* Every activity of the day that was clicked. */}
+            <Dialog
+                open={selected !== null}
+                onOpenChange={(open) => !open && setPicked(null)}
+            >
+                <DialogContent className="sm:max-w-2xl">
+                    {selected && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {formatDate(selected)}
+                                    {selected === today && ' (today)'}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    {schedule.length === 0
+                                        ? 'Nobody arrives or checks out on this day.'
+                                        : `${plural(schedule.length, 'activity', 'activities')}. Open one to see the booking.`}
+                                </DialogDescription>
+                            </DialogHeader>
+                            {schedule.length > 0 && (
+                                <div className="grid max-h-[60vh] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                                    {schedule.map((event) => (
+                                        <EventCard
+                                            key={`${event.type}-${event.href}`}
+                                            event={event}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            <DialogFooter>
+                                <DialogClose asChild>
+                                    <Button variant="outline">Close</Button>
+                                </DialogClose>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
+    );
+}
+
+/** One arrival or check-out; it opens the reservation or the stay. */
+function EventCard({
+    event,
+    compact = false,
+}: {
+    event: CalendarEvent;
+    compact?: boolean;
+}) {
+    return (
+        <Link
+            href={event.href}
+            title={`${event.label}: ${event.guest}, ${event.rooms}, ${formatTime(event.at)}`}
+            className={cn(
+                'block rounded-md border-l-4 px-2 py-1.5 hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                compact ? 'mt-1 text-xs' : 'text-sm',
+                tone[event.type],
+            )}
+        >
+            <b className="block truncate">{event.label}</b>
+            <span className="block truncate font-medium">{event.guest}</span>
+            {!compact && event.company && (
+                <span className="block truncate text-xs">{event.company}</span>
+            )}
+            <span className="block truncate text-[11px]">
+                {event.rooms} · {formatTime(event.at)}
+            </span>
+            <span className="block truncate text-[11px] opacity-70">
+                {event.status}
+            </span>
+        </Link>
     );
 }
 

@@ -174,3 +174,41 @@ input[type='password']::-ms-reveal,
 input[type='password']::-ms-clear {
     display: none;
 }
+
+/* Printing a page (e.g. Reports): only the page itself, on white, with nothing cut off. */
+@media print {
+    [data-slot='sidebar'],
+    [data-slot='sidebar-trigger'],
+    [data-slot='sidebar-inset'] > header,
+    [data-sonner-toaster] {
+        display: none !important;
+    }
+
+    html,
+    body,
+    [data-slot='sidebar-wrapper'],
+    [data-slot='sidebar-inset'] {
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+        box-shadow: none !important;
+    }
+
+    /* Tables scroll sideways on screen; on paper they must show whole. */
+    [data-slot='card-content'],
+    [data-slot='table-container'] {
+        overflow: visible !important;
+    }
+
+    [data-slot='table-head'],
+    [data-slot='table-cell'] {
+        white-space: normal !important;
+    }
+
+    [data-slot='card'] {
+        box-shadow: none !important;
+    }
+}

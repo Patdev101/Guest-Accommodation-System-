@@ -203,7 +203,9 @@ export default function Options({
                                     <CardDescription>
                                         A backup is written every night at 2:00
                                         AM (when the scheduler is running).
-                                        Older ones are deleted.
+                                        Older ones are deleted. Keep between 1
+                                        and 60; with one backup a night, 7 means
+                                        you can go back about a week.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>

@@ -1,9 +1,11 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, BedDouble, ChevronRight } from 'lucide-react';
+import { AlertTriangle, BedDouble, ChevronRight, LogOut } from 'lucide-react';
+import { StatTile } from '@/components/admin/stat-tile';
 import { EmptyState } from '@/components/empty-state';
 import { Page, PageHeader } from '@/components/page';
 import { Pager } from '@/components/pager';
 import { StayStateBadge } from '@/components/reception/badges';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
     Table,
@@ -24,18 +26,37 @@ import type { Paginated, StayRow } from '@/types';
 type Props = {
     stays: Paginated<StayRow>;
     show: string;
+    stats: { overdue: number; due_today: number; upcoming: number };
     filterOptions: { value: string; label: string }[];
 };
 
-export default function Stays({ stays, show, filterOptions }: Props) {
+export default function Stays({ stays, show, stats, filterOptions }: Props) {
     return (
         <>
-            <Head title="In house" />
+            <Head title="Check-out" />
             <Page>
                 <PageHeader
-                    title="In house"
-                    description="Checked-in bookings. Open one to extend, check out, inspect the rooms, settle the bill and return the ID."
+                    title="Check-out"
+                    description="Guests in house. Open one to extend, check out, inspect the rooms, settle the bill and return the ID."
                 />
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                    <StatTile
+                        label="Overdue"
+                        value={stats.overdue}
+                        detail="Past their check-out time"
+                    />
+                    <StatTile
+                        label="Due today"
+                        value={stats.due_today}
+                        detail="Expected to leave later today"
+                    />
+                    <StatTile
+                        label="Upcoming"
+                        value={stats.upcoming}
+                        detail="Leaving on another day"
+                    />
+                </div>
 
                 <ToggleGroup
                     type="single"
@@ -151,8 +172,27 @@ export default function Stays({ stays, show, filterOptions }: Props) {
                                                 state={stay.state}
                                             />
                                         </TableCell>
-                                        <TableCell className="pr-4 text-muted-foreground">
-                                            <ChevronRight className="size-4" />
+                                        <TableCell className="pr-4 text-right text-muted-foreground">
+                                            {stay.state === 'in_house' ? (
+                                                <Button
+                                                    size="sm"
+                                                    asChild
+                                                    onClick={(event) =>
+                                                        event.stopPropagation()
+                                                    }
+                                                >
+                                                    <Link
+                                                        href={staysShow(
+                                                            stay.id,
+                                                        )}
+                                                    >
+                                                        <LogOut />
+                                                        Check out
+                                                    </Link>
+                                                </Button>
+                                            ) : (
+                                                <ChevronRight className="ml-auto size-4" />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -168,5 +208,5 @@ export default function Stays({ stays, show, filterOptions }: Props) {
 }
 
 Stays.layout = {
-    breadcrumbs: [{ title: 'In house', href: staysIndex() }],
+    breadcrumbs: [{ title: 'Check-out', href: staysIndex() }],
 };

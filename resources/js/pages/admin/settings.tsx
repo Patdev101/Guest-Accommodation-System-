@@ -431,7 +431,13 @@ function MinutesInput({
                 min={min}
                 max={1440}
                 value={Number.isNaN(value) ? '' : value}
-                onChange={(event) => onChange(event.target.valueAsNumber)}
+                onChange={(event) =>
+                    onChange(
+                        event.target.value === ''
+                            ? Number.NaN
+                            : Number(event.target.value),
+                    )
+                }
                 className="pr-32"
                 required
             />

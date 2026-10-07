@@ -1003,7 +1003,7 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 
 StayPage.layout = (props: Props) => ({
     breadcrumbs: [
-        { title: 'In house', href: staysIndex() },
+        { title: 'Check-out', href: staysIndex() },
         { title: props.stay.contact_name, href: staysShow(props.stay.id) },
     ],
 });

@@ -113,8 +113,17 @@ class ReservationController extends Controller
         return $this->bookingPage($request, $availability, $reservation->load(['guest', 'rooms']));
     }
 
+    /**
+     * Check-in for guests who are here without a booking: the same page, opened
+     * from Check-in, that saves and goes straight on to the check-in form.
+     */
+    public function walkIn(Request $request, Availability $availability): Response
+    {
+        return $this->bookingPage($request, $availability, walkIn: true);
+    }
+
     /** The booking page: new, or editing a reservation (its own rooms then count as free). */
-    private function bookingPage(Request $request, Availability $availability, ?Reservation $editing = null): Response
+    private function bookingPage(Request $request, Availability $availability, ?Reservation $editing = null, bool $walkIn = false): Response
     {
         $query = Validator::make($request->query(), [
             'starts_at' => ['date_format:'.StoreReservationRequest::DATE_FORMAT],
@@ -123,7 +132,7 @@ class ReservationController extends Controller
             'location' => ['integer'],
             'walk_in' => ['boolean'],
         ])->valid();
-        $walkIn = (bool) ($query['walk_in'] ?? false);
+        $walkIn = $walkIn || ($query['walk_in'] ?? false);
 
         $checkIn = (string) Setting::get('standard_check_in_time');
         $checkOut = (string) Setting::get('standard_check_out_time');

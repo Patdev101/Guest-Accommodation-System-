@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\SetPasswordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Reception\AlertController;
+use App\Http\Controllers\Reception\ArrivalsController;
 use App\Http\Controllers\Reception\CalendarController;
 use App\Http\Controllers\Reception\ChargeController;
 use App\Http\Controllers\Reception\CheckInController;
@@ -61,6 +62,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('reservations/{reservation}/check-in', [CheckInController::class, 'store'])->name('reservations.check-in.store');
         Route::get('id-photos/{idCustody}', IdPhotoController::class)->name('id-photos.show');
 
+        Route::get('check-in', ArrivalsController::class)->name('check-in');
+        Route::get('check-in/walk-in', [ReservationController::class, 'walkIn'])->name('walk-in');
         Route::get('calendar', CalendarController::class)->name('calendar');
 
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');

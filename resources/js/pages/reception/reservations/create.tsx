@@ -43,6 +43,7 @@ import {
 } from '@/lib/format';
 import { suggestPrice } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
+import { checkIn, walkIn as walkInPage } from '@/routes/reception';
 import {
     create as reservationsCreate,
     edit as reservationsEdit,
@@ -254,13 +255,14 @@ export default function NewReservation({
         router.get(
             editing
                 ? reservationsEdit(editing.id).url
-                : reservationsCreate().url,
+                : walkIn
+                  ? walkInPage().url
+                  : reservationsCreate().url,
             {
                 starts_at: startsAt,
                 ends_at: endsAt,
                 pax: nextPax,
                 location: nextLocation ?? undefined,
-                walk_in: walkIn ? 1 : undefined,
             },
             {
                 only: ['window', 'rooms', 'freeCapacity', 'earliest'],
@@ -432,7 +434,7 @@ export default function NewReservation({
                     editing
                         ? `Edit reservation #${editing.id}`
                         : walkIn
-                          ? 'Walk-in'
+                          ? 'Walk-in check-in'
                           : 'New reservation'
                 }
             />
@@ -442,17 +444,42 @@ export default function NewReservation({
                         editing
                             ? `Edit reservation #${editing.id}`
                             : walkIn
-                              ? 'Walk-in'
+                              ? 'Walk-in check-in'
                               : 'New reservation'
                     }
                     description={
                         editing
                             ? 'Change the dates, rooms, guests per room, prices or contact details. The rooms this booking already has count as free. Payments are recorded on the reservation page.'
                             : walkIn
-                              ? 'Guests who are here now: choose the rooms, save, then check them in straight away.'
+                              ? 'For guests who are here now without a booking. Choose their rooms first; the guest list and ID come right after.'
                               : `Book one or more rooms for a guest or a company. The guest list and ID are taken at check-in. Standard times: check-in ${formatClock(standardTimes.check_in)}, check-out ${formatClock(standardTimes.check_out)}.`
                     }
                 />
+
+                {walkIn && !editing && (
+                    <ol className="grid gap-2 text-sm sm:grid-cols-2">
+                        <li className="flex items-center gap-3 rounded-lg border border-primary bg-primary/5 px-4 py-3">
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                                1
+                            </span>
+                            <span>
+                                <b className="block">Rooms and contact</b>
+                                <span className="text-muted-foreground">
+                                    You are here
+                                </span>
+                            </span>
+                        </li>
+                        <li className="flex items-center gap-3 rounded-lg border px-4 py-3 text-muted-foreground">
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">
+                                2
+                            </span>
+                            <span>
+                                <b className="block">Guest list and ID</b>
+                                Opens when you save
+                            </span>
+                        </li>
+                    </ol>
+                )}
 
                 <form onSubmit={submit} className="space-y-6">
                     <Card>
@@ -1346,7 +1373,9 @@ function RoomRow({
 
 NewReservation.layout = (props: Props) => ({
     breadcrumbs: [
-        { title: 'Reservations', href: reservationsIndex() },
+        props.walkIn && !props.editing
+            ? { title: 'Check-in', href: checkIn() }
+            : { title: 'Reservations', href: reservationsIndex() },
         ...(props.editing
             ? [
                   {
@@ -1362,7 +1391,7 @@ NewReservation.layout = (props: Props) => ({
                   props.walkIn
                       ? {
                             title: 'Walk-in',
-                            href: reservationsCreate({ query: { walk_in: 1 } }),
+                            href: walkInPage(),
                         }
                       : {
                             title: 'New reservation',

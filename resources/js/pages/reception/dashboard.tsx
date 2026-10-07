@@ -58,6 +58,7 @@ import {
 import { groupColor } from '@/lib/room-status';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { walkIn } from '@/routes/reception';
 import { index as refundsIndex } from '@/routes/reception/refunds';
 import {
     create as reservationsCreate,
@@ -214,11 +215,7 @@ export default function FrontDesk({
                                 />
                             </form>
                             <Button variant="outline" asChild>
-                                <Link
-                                    href={reservationsCreate({
-                                        query: { walk_in: 1 },
-                                    })}
-                                >
+                                <Link href={walkIn()}>
                                     <DoorOpen />
                                     Walk-in
                                 </Link>

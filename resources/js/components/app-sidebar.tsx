@@ -1,7 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BedDouble,
-    BedSingle,
     CalendarCheck,
     CalendarDays,
     ChartColumn,
@@ -10,6 +9,8 @@ import {
     History,
     IdCard,
     LayoutGrid,
+    LogIn,
+    LogOut,
     MapPin,
     Settings2,
     UserRound,
@@ -36,7 +37,7 @@ import { edit as settingsEdit } from '@/routes/admin/settings';
 import { index as usersIndex } from '@/routes/admin/users';
 import { edit as optionsEdit } from '@/routes/admin/options';
 import { index as reportsIndex } from '@/routes/admin/reports';
-import { calendar, pending } from '@/routes/reception';
+import { calendar, checkIn, pending } from '@/routes/reception';
 import { index as refundsIndex } from '@/routes/reception/refunds';
 import { index as reservationsIndex } from '@/routes/reception/reservations';
 import { index as staysIndex } from '@/routes/reception/stays';
@@ -55,7 +56,21 @@ const sections: NavSection[] = [
         label: 'Front desk',
         // The Admin can do everything Reception can (owner, 6 Oct 2026).
         roles: ['reception', 'admin'],
+        // Same order as the owner's simple demo (7 Oct 2026). "Check-out" is the
+        // list of guests in house (the stays pages).
         items: [
+            {
+                title: 'Check-in',
+                href: checkIn(),
+                icon: LogIn,
+                matchChildren: true,
+            },
+            {
+                title: 'Check-out',
+                href: staysIndex(),
+                icon: LogOut,
+                matchChildren: true,
+            },
             {
                 title: 'Reservations',
                 href: reservationsIndex(),
@@ -63,12 +78,6 @@ const sections: NavSection[] = [
                 matchChildren: true,
             },
             { title: 'Calendar', href: calendar(), icon: CalendarDays },
-            {
-                title: 'In house',
-                href: staysIndex(),
-                icon: BedSingle,
-                matchChildren: true,
-            },
             { title: 'Unpaid and IDs held', href: pending(), icon: IdCard },
             { title: 'Refunds', href: refundsIndex(), icon: HandCoins },
         ],

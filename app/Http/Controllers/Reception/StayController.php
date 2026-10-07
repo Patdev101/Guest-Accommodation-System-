@@ -66,6 +66,12 @@ class StayController extends Controller
         return Inertia::render('reception/stays/index', [
             'stays' => $query->orderByDesc('id')->paginate(25)->withQueryString()->through(fn (Stay $stay) => self::row($stay)),
             'show' => $show,
+            // Guests in house, by when they are due to leave.
+            'stats' => [
+                'overdue' => Stay::query()->whereNull('checked_out_at')->where('expected_check_out_at', '<', now())->count(),
+                'due_today' => Stay::query()->whereNull('checked_out_at')->whereBetween('expected_check_out_at', [now(), today()->endOfDay()])->count(),
+                'upcoming' => Stay::query()->whereNull('checked_out_at')->where('expected_check_out_at', '>', today()->endOfDay())->count(),
+            ],
             'filterOptions' => collect(self::FILTERS)->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values(),
         ]);
     }
