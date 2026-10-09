@@ -3,6 +3,7 @@ import {
     AlertTriangle,
     CalendarCheck,
     ChevronRight,
+    Inbox,
     LogIn,
     Plus,
     Search,
@@ -35,6 +36,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { formatDayTime, formatPeso, plural, todayIso } from '@/lib/format';
+import { index as requestsIndex } from '@/routes/reception/requests';
 import {
     create as reservationsCreate,
     index as reservationsIndex,
@@ -46,12 +48,14 @@ type Props = {
     reservations: Paginated<ReservationRow>;
     filters: { show: string; search: string };
     filterOptions: { value: string; label: string }[];
+    waitingRequests: number;
 };
 
 export default function Reservations({
     reservations,
     filters,
     filterOptions,
+    waitingRequests,
 }: Props) {
     const [search, setSearch] = useState(filters.search);
     const today = todayIso();
@@ -92,6 +96,29 @@ export default function Reservations({
                         </Button>
                     }
                 />
+
+                {waitingRequests > 0 && (
+                    <Link
+                        href={requestsIndex()}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm outline-none hover:bg-amber-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:border-amber-800 dark:bg-amber-950/40 dark:hover:bg-amber-950/60"
+                    >
+                        <span className="flex items-center gap-2">
+                            <Inbox className="size-4 shrink-0" />
+                            <span>
+                                <b>
+                                    {plural(waitingRequests, 'booking request')}
+                                </b>{' '}
+                                from guests{' '}
+                                {waitingRequests === 1 ? 'is' : 'are'} waiting
+                                for your answer. They become reservations when
+                                you approve them.
+                            </span>
+                        </span>
+                        <span className="font-medium underline-offset-4 hover:underline">
+                            Review requests
+                        </span>
+                    </Link>
+                )}
 
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative w-full sm:w-72">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reception;
 
 use App\Enums\BilledTo;
 use App\Enums\BookingChannel;
+use App\Enums\BookingRequestStatus;
 use App\Enums\GuestType;
 use App\Enums\NoShowRefund;
 use App\Enums\PaymentStatus;
@@ -11,6 +12,7 @@ use App\Enums\PaymentType;
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reception\StoreReservationRequest;
+use App\Models\BookingRequest;
 use App\Models\ExtensionMove;
 use App\Models\Guest;
 use App\Models\Location;
@@ -94,6 +96,8 @@ class ReservationController extends Controller
                 ->withQueryString()
                 ->through(fn (Reservation $reservation) => self::row($reservation)),
             'filters' => ['show' => $show, 'search' => $search],
+            // Online requests are not reservations until approved; point reception at them.
+            'waitingRequests' => BookingRequest::query()->where('status', BookingRequestStatus::Pending)->count(),
             'filterOptions' => collect(self::FILTERS)->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values(),
         ]);
     }
@@ -131,6 +135,8 @@ class ReservationController extends Controller
             'pax' => ['integer', 'min:1', 'max:1000'],
             'location' => ['integer'],
             'walk_in' => ['boolean'],
+            // "Get room" on the dashboard: start with this room already added.
+            'room' => ['integer'],
         ])->valid();
         $walkIn = $walkIn || ($query['walk_in'] ?? false);
 
@@ -205,6 +211,7 @@ class ReservationController extends Controller
             'paymentMethods' => Payment::methods(),
             'standardTimes' => ['check_in' => $checkIn, 'check_out' => $checkOut],
             'walkIn' => $walkIn,
+            'preselect' => isset($query['room']) ? (int) $query['room'] : null,
             // Filled when an existing reservation is being changed.
             'editing' => $editing === null ? null : [
                 'id' => $editing->id,

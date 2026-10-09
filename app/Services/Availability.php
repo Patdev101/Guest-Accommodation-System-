@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ReservationStatus;
 use App\Enums\RoomStatus;
+use App\Models\BookingRequestRoom;
 use App\Models\ReservationRoom;
 use App\Models\Room;
 use App\Models\Setting;
@@ -19,7 +20,8 @@ use Illuminate\Database\Eloquent\Collection;
  * the current stay, each followed by the cleaning buffer. A stay whose guest
  * has not yet confirmed they are not extending keeps the room busy with no
  * end (rule 13). Rooms under maintenance or out of service cannot be booked
- * (open question 4).
+ * (open question 4). An online booking request that is still waiting holds
+ * its rooms too, until Reception answers or the hold runs out.
  */
 class Availability
 {
@@ -37,10 +39,32 @@ class Availability
      * @param  list<int>  $roomIds
      * @return array<int, list<BusyPeriod>>
      */
-    public function busyPeriods(array $roomIds, ?int $ignoreReservationId = null): array
+    public function busyPeriods(array $roomIds, ?int $ignoreReservationId = null, ?int $ignoreRequestId = null): array
     {
         $buffer = $this->bufferMinutes();
         $periods = array_fill_keys($roomIds, []);
+
+        // An online booking request holds its rooms while it waits for Reception.
+        $held = BookingRequestRoom::query()
+            ->whereIn('room_id', $roomIds)
+            ->whereHas('bookingRequest', fn ($query) => $query
+                ->holding()
+                ->where('ends_at', '>', now()->subMinutes($buffer))
+                ->when($ignoreRequestId, fn ($query) => $query->whereKeyNot($ignoreRequestId)))
+            ->with('bookingRequest')
+            ->get();
+
+        foreach ($held as $line) {
+            $request = $line->bookingRequest;
+            $periods[$line->room_id][] = new BusyPeriod(
+                $request->starts_at,
+                $request->ends_at->copy()->addMinutes($buffer),
+                __('Held for an online booking request, :from – :to', [
+                    'from' => $this->format($request->starts_at),
+                    'to' => $this->format($request->ends_at),
+                ]),
+            );
+        }
 
         $lines = ReservationRoom::query()
             ->whereIn('room_id', $roomIds)

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Concerns\CastsKeysToIntegers;
 use App\Enums\BookingRequestStatus;
 use App\Enums\GuestType;
+use App\Enums\ReservationStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -103,5 +104,24 @@ class BookingRequest extends Model
     public function isPending(): bool
     {
         return $this->status === BookingRequestStatus::Pending;
+    }
+
+    /**
+     * What to show as the status. An approved request follows its reservation,
+     * so a booking that was cancelled later does not still read "Approved".
+     *
+     * @return array{status: string, label: string}
+     */
+    public function shownStatus(): array
+    {
+        $reservation = $this->status === BookingRequestStatus::Approved ? $this->reservation : null;
+
+        return match ($reservation?->status) {
+            ReservationStatus::Cancelled => ['status' => 'cancelled', 'label' => 'Approved, then cancelled'],
+            ReservationStatus::NoShow => ['status' => 'cancelled', 'label' => 'Approved, guest did not arrive'],
+            ReservationStatus::CheckedIn => ['status' => 'approved', 'label' => 'Approved, checked in'],
+            ReservationStatus::CheckedOut => ['status' => 'approved', 'label' => 'Approved, stay completed'],
+            default => ['status' => $this->status->value, 'label' => $this->status->label()],
+        };
     }
 }

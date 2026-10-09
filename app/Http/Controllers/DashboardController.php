@@ -22,25 +22,24 @@ use App\Models\Setting;
 use App\Models\Stay;
 use App\Models\StayGuest;
 use App\Models\StayRoom;
-use App\Models\User;
 use App\Services\Reports;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request): Response|RedirectResponse
     {
-        $user = $request->user();
-
-        return match ($user->role) {
+        return match ($request->user()->role) {
             Role::Admin => Inertia::render('admin/dashboard', $this->forAdmin()),
             Role::Reception => Inertia::render('reception/dashboard', $this->forReception()),
-            Role::Guest => Inertia::render('dashboard', $this->forGuest($user)),
+            // Guests have no staff dashboard: they have their own screen.
+            Role::Guest => to_route('guest.home'),
         };
     }
 
@@ -243,28 +242,6 @@ class DashboardController extends Controller
                 'reminder' => (int) $settings['checkout_reminder_minutes'],
             ],
         ];
-    }
-
-    /** @return array<string, mixed> */
-    private function forGuest(User $user): array
-    {
-        $reservations = Reservation::query()
-            ->whereHas('guest', fn ($query) => $query->where('user_id', $user->id))
-            ->where('status', ReservationStatus::Active)
-            ->with('rooms.room.location')
-            ->orderBy('starts_at')
-            ->get()
-            ->map(fn (Reservation $reservation) => [
-                'id' => $reservation->id,
-                'room' => $reservation->rooms->map(fn (ReservationRoom $line) => $line->room->name)->implode(', '),
-                'location' => $reservation->rooms->map(fn (ReservationRoom $line) => $line->room->location->name)->unique()->implode(', '),
-                'starts_at' => $reservation->starts_at->toIso8601String(),
-                'ends_at' => $reservation->ends_at->toIso8601String(),
-                'pax' => (int) $reservation->rooms->sum('pax'),
-                'payment_status' => $reservation->paymentStatus()->value,
-            ]);
-
-        return ['reservations' => $reservations];
     }
 
     /**

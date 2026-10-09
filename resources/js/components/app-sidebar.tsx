@@ -8,6 +8,7 @@ import {
     HandCoins,
     History,
     IdCard,
+    Inbox,
     LayoutGrid,
     LogIn,
     LogOut,
@@ -39,6 +40,7 @@ import { edit as optionsEdit } from '@/routes/admin/options';
 import { index as reportsIndex } from '@/routes/admin/reports';
 import { calendar, checkIn, pending } from '@/routes/reception';
 import { index as refundsIndex } from '@/routes/reception/refunds';
+import { index as requestsIndex } from '@/routes/reception/requests';
 import { index as reservationsIndex } from '@/routes/reception/reservations';
 import { index as staysIndex } from '@/routes/reception/stays';
 import type { NavItem, Role } from '@/types';
@@ -76,6 +78,11 @@ const sections: NavSection[] = [
                 href: reservationsIndex(),
                 icon: CalendarCheck,
                 matchChildren: true,
+            },
+            {
+                title: 'Booking requests',
+                href: requestsIndex(),
+                icon: Inbox,
             },
             { title: 'Calendar', href: calendar(), icon: CalendarDays },
             { title: 'Unpaid and IDs held', href: pending(), icon: IdCard },

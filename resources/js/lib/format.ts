@@ -42,9 +42,12 @@ export function formatPeso(amount: string | number): string {
         : peso.format(value);
 }
 
-/** A "YYYY-MM-DD" date shown as e.g. "29 Sept 2026", read in local time. */
+/**
+ * A "YYYY-MM-DD" date shown as e.g. "29 Sept 2026", read in local time. A full
+ * timestamp ("2026-10-09T10:30:00+08:00") is accepted too: only its date is used.
+ */
 export function formatDate(date: string): string {
-    const [year, month, day] = date.split('-').map(Number);
+    const [year, month, day] = date.slice(0, 10).split('-').map(Number);
 
     return longDate.format(new Date(year, month - 1, day));
 }

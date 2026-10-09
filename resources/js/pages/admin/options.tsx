@@ -31,6 +31,12 @@ type Props = {
     photos: { kept: number; returned: number; due: number };
     backupsToKeep: number;
     backups: Backup[];
+    site: {
+        contact_phone: string;
+        contact_email: string;
+        contact_address: string;
+        booking_request_hold_hours: number;
+    };
 };
 
 function fileSize(bytes: number): string {
@@ -46,6 +52,7 @@ export default function Options({
     photos,
     backupsToKeep,
     backups,
+    site,
 }: Props) {
     const [emails, setEmails] = useState(alertEmails);
     const [deletingPhotos, setDeletingPhotos] = useState(false);
@@ -235,6 +242,92 @@ export default function Options({
                                 </Button>
                             </div>
                         </>
+                    )}
+                </Form>
+
+                <Form
+                    {...OptionsController.updateSite.form()}
+                    options={{ preserveScroll: true }}
+                >
+                    {({ errors, processing }) => (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Guest website</CardTitle>
+                                <CardDescription>
+                                    How visitors reach the front desk, shown on
+                                    the public pages. Leave a box empty to hide
+                                    it.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="grid gap-4 sm:grid-cols-2">
+                                <FormField
+                                    label="Front desk phone"
+                                    htmlFor="contact_phone"
+                                    error={errors.contact_phone}
+                                    optional
+                                >
+                                    <Input
+                                        id="contact_phone"
+                                        name="contact_phone"
+                                        type="tel"
+                                        maxLength={60}
+                                        defaultValue={site.contact_phone}
+                                    />
+                                </FormField>
+                                <FormField
+                                    label="Front desk email"
+                                    htmlFor="contact_email"
+                                    error={errors.contact_email}
+                                    optional
+                                >
+                                    <Input
+                                        id="contact_email"
+                                        name="contact_email"
+                                        type="email"
+                                        defaultValue={site.contact_email}
+                                    />
+                                </FormField>
+                                <FormField
+                                    label="Address"
+                                    htmlFor="contact_address"
+                                    error={errors.contact_address}
+                                    className="sm:col-span-2"
+                                    optional
+                                >
+                                    <Input
+                                        id="contact_address"
+                                        name="contact_address"
+                                        maxLength={255}
+                                        defaultValue={site.contact_address}
+                                    />
+                                </FormField>
+                                <FormField
+                                    label="Hours a booking request holds its rooms"
+                                    htmlFor="booking_request_hold_hours"
+                                    error={errors.booking_request_hold_hours}
+                                    hint="From 1 to 168 (a week). A request nobody answers in this time expires and frees the rooms."
+                                    className="sm:col-span-2"
+                                >
+                                    <Input
+                                        id="booking_request_hold_hours"
+                                        name="booking_request_hold_hours"
+                                        type="number"
+                                        min={1}
+                                        max={168}
+                                        defaultValue={
+                                            site.booking_request_hold_hours
+                                        }
+                                        className="w-32"
+                                        required
+                                    />
+                                </FormField>
+                                <div className="flex justify-end sm:col-span-2">
+                                    <Button type="submit" disabled={processing}>
+                                        Save guest website
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
                 </Form>
 

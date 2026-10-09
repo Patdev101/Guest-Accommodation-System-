@@ -21,15 +21,12 @@ class DashboardTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
-    public function test_guest_accounts_see_their_reservations()
+    public function test_guest_accounts_have_no_staff_dashboard()
     {
+        // They have their own screen.
         $this->actingAs(User::factory()->create())
             ->get(route('dashboard'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('dashboard')
-                ->has('reservations', 0)
-                ->missing('stats'));
+            ->assertRedirect(route('guest.home'));
     }
 
     public function test_reception_sees_the_front_desk_day()

@@ -26,6 +26,9 @@ class ProfileUpdateRequest extends FormRequest
         return [
             ...$this->profileRules($this->user()->id),
             'contact_number' => $contactNumberRules,
+            // Guests only: the company they book for. It can be changed any time,
+            // e.g. after moving to another company.
+            'company' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

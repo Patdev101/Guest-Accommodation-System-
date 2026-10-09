@@ -31,6 +31,10 @@ class Setting extends Model
         'backups_to_keep' => '7',
         // Hours an online booking request holds its rooms while it waits for Reception.
         'booking_request_hold_hours' => '24',
+        // How visitors reach the front desk; shown on the public pages when filled in.
+        'contact_phone' => '',
+        'contact_email' => '',
+        'contact_address' => '',
     ];
 
     protected $primaryKey = 'key';
@@ -57,6 +61,10 @@ class Setting extends Model
         'alert_emails' => 'Email urgent alerts to reception',
         'id_photo_retention_days' => 'Days to keep ID photos after return',
         'backups_to_keep' => 'Backups to keep',
+        'booking_request_hold_hours' => 'Hours a booking request holds its rooms',
+        'contact_phone' => 'Front desk phone',
+        'contact_email' => 'Front desk email',
+        'contact_address' => 'Address',
     ];
 
     public static function set(string $key, ?string $value): void

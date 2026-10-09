@@ -7,8 +7,11 @@ use App\Enums\ReminderType;
 use App\Enums\ReservationStatus;
 use App\Enums\Role;
 use App\Enums\RoomStatus;
+use App\Models\BookingRequest;
+use App\Models\BookingRequestRoom;
 use App\Models\Extension;
 use App\Models\ExtensionMove;
+use App\Models\Guest;
 use App\Models\Reservation;
 use App\Models\ReservationRoom;
 use App\Models\Room;
@@ -17,6 +20,7 @@ use App\Models\Stay;
 use App\Models\StayRoom;
 use App\Models\User;
 use App\Notifications\FrontDeskAlert;
+use App\Notifications\GuestNotice;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -52,6 +56,9 @@ class FrontDeskAlerts
     /** @return int How many alerts were sent. */
     public function run(): int
     {
+        // Booking requests nobody answered in time let go of their rooms.
+        app(BookingRequests::class)->expire();
+
         return $this->checkOutCalls() + $this->notArrived() + $this->arrivingSoon() + $this->roomClashes();
     }
 
@@ -86,6 +93,13 @@ class FrontDeskAlerts
                     ]),
                     route('reception.stays.show', $stay),
                 ));
+
+                // Rule 18: the guest gets the same reminder under their bell.
+                GuestNotice::tell(
+                    $this->accountOf($stay->guest_id),
+                    __('Your check-out is coming up'),
+                    __('Check-out is at :time. To stay longer, ask the front desk before then.', ['time' => $stay->expected_check_out_at->format('g:i A')]),
+                );
             });
         }
 
@@ -207,6 +221,25 @@ class FrontDeskAlerts
         ), $by);
     }
 
+    /** A guest sent a booking request online; Reception must approve or decline it. */
+    public function requested(BookingRequest $request): void
+    {
+        $request->loadMissing('rooms.room:id,name');
+
+        $this->toDesk(new FrontDeskAlert(
+            'request',
+            __('Booking request from :name', ['name' => $request->contact_name]),
+            __(':rooms · :guests · :from to :to. Approve or decline it; the room is held until :until.', [
+                'rooms' => $request->rooms->map(fn (BookingRequestRoom $line) => $line->room->name)->implode(', '),
+                'guests' => $this->guests($request->guests),
+                'from' => $request->starts_at->format('j M'),
+                'to' => $request->ends_at->format('j M'),
+                'until' => $request->hold_expires_at?->format('j M g:i A') ?? __('you answer'),
+            ]),
+            route('reception.requests.index'),
+        ));
+    }
+
     /** Rule 27: a booking's dates, rooms or contact were changed. */
     public function changed(Reservation $reservation, ?User $by): void
     {
@@ -241,6 +274,38 @@ class FrontDeskAlerts
             ]),
             route('reception.reservations.show', $reservation),
         ), $by);
+
+        // The guest hears about it too, unless they cancelled it themselves.
+        $account = $this->accountOf($reservation->guest_id);
+
+        if ($account !== null && ! $account->is($by)) {
+            GuestNotice::tell(
+                $account,
+                $noShow ? __('Your booking was marked as a no-show') : __('Your booking was cancelled'),
+                $noShow
+                    ? __(':rooms, :time. Nobody arrived, so the room was released.', ['rooms' => $this->roomNames($reservation->rooms), 'time' => $reservation->starts_at->format('j M g:i A')])
+                    : __(':rooms, :time. Reason: :reason', ['rooms' => $this->roomNames($reservation->rooms), 'time' => $reservation->starts_at->format('j M g:i A'), 'reason' => (string) $reservation->cancellation_reason]),
+                route('guest.reservations.show', $reservation),
+            );
+        }
+    }
+
+    /** A guest asked from their own screen to stay longer; Reception decides on the stay page. */
+    public function guestAsksToExtend(Stay $stay, CarbonImmutable $until, ?string $message): void
+    {
+        $stay->loadMissing(['guest:id,name', 'rooms.room:id,name']);
+
+        $this->toDesk(new FrontDeskAlert(
+            'extension_waiting',
+            __(':name asks to stay longer', ['name' => $stay->guest->name]),
+            __(':rooms, until :time instead of :now.:message Open the stay to check the room and extend it.', [
+                'rooms' => $this->roomNames($stay->rooms),
+                'time' => $until->format('j M g:i A'),
+                'now' => $stay->expected_check_out_at->format('j M g:i A'),
+                'message' => filled($message) ? ' "'.$message.'"' : '',
+            ]),
+            route('reception.stays.show', [$stay, 'extend_to' => $until->format('Y-m-d\TH:i')]),
+        ));
     }
 
     /** Rule 27: a room is ready again. */
@@ -304,6 +369,22 @@ class FrontDeskAlerts
                 : (string) $reason,
             route('reception.stays.show', $stay),
         ), $by);
+
+        GuestNotice::tell(
+            $this->accountOf($stay->guest_id),
+            $approved ? __('Your stay was extended') : __('Your stay could not be extended'),
+            $approved
+                ? __('Your new check-out is :time.', ['time' => $stay->expected_check_out_at->format('j M g:i A')])
+                : (string) $reason,
+        );
+    }
+
+    /** The guest account behind a booking, when it has one. */
+    private function accountOf(int $guestId): ?User
+    {
+        $userId = Guest::query()->whereKey($guestId)->value('user_id');
+
+        return $userId === null ? null : User::query()->whereKey($userId)->first();
     }
 
     /** For the Admin: a room was sent for repair or taken out of service. */

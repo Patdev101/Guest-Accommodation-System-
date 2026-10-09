@@ -18,8 +18,14 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\SetPasswordController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Guest\BookingRequestController as GuestBookingRequestController;
+use App\Http\Controllers\Guest\HomeController as GuestHomeController;
+use App\Http\Controllers\Guest\ReservationController as GuestReservationController;
+use App\Http\Controllers\Guest\StayController as GuestStayController;
+use App\Http\Controllers\Public\RoomController as PublicRoomController;
 use App\Http\Controllers\Reception\AlertController;
 use App\Http\Controllers\Reception\ArrivalsController;
+use App\Http\Controllers\Reception\BookingRequestController;
 use App\Http\Controllers\Reception\CalendarController;
 use App\Http\Controllers\Reception\ChargeController;
 use App\Http\Controllers\Reception\CheckInController;
@@ -37,9 +43,11 @@ use App\Http\Controllers\Reception\StayPaymentController;
 use App\Http\Controllers\Reception\StayToolsController;
 use Illuminate\Support\Facades\Route;
 
-// Admin-only phase: the home address goes straight to the dashboard (or the
-// login page). It becomes the public, Airbnb-style room browsing page later.
-Route::get('/', fn () => auth()->check() ? to_route('dashboard') : to_route('login'))->name('home');
+// The public side: anyone can browse the rooms without logging in (rule 10).
+// Staff who open "/" go to their dashboard.
+Route::get('/', [PublicRoomController::class, 'home'])->name('home');
+Route::get('rooms', [PublicRoomController::class, 'index'])->name('rooms.index');
+Route::get('rooms/{room}', [PublicRoomController::class, 'show'])->name('rooms.show');
 
 // First-time password setup from the emailed link (accounts an Admin created).
 Route::middleware('guest')->group(function () {
@@ -51,6 +59,20 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    // The guest's own screen: their stay, booking requests and reservations.
+    Route::middleware('role:guest')->name('guest.')->group(function () {
+        Route::get('my', GuestHomeController::class)->name('home');
+        // A booking request for one room; Reception approves or declines it.
+        Route::get('book/{room}', [GuestBookingRequestController::class, 'create'])->name('requests.create');
+        Route::post('book/{room}', [GuestBookingRequestController::class, 'store'])->middleware('throttle:10,1')->name('requests.store');
+        Route::patch('my/requests/{bookingRequest}/cancel', [GuestBookingRequestController::class, 'cancel'])->name('requests.cancel');
+        // A confirmed booking: see it, and cancel it (rule 16).
+        Route::get('my/reservations/{reservation}', [GuestReservationController::class, 'show'])->name('reservations.show');
+        Route::patch('my/reservations/{reservation}/cancel', [GuestReservationController::class, 'cancel'])->name('reservations.cancel');
+        Route::post('my/stay/extension', [GuestStayController::class, 'askExtension'])->middleware('throttle:3,10')->name('stay.extension');
+        Route::post('my/notices/read', [GuestStayController::class, 'readNotices'])->name('notices.read');
+    });
 
     // Front desk: Reception, and the Admin, who can do everything Reception can.
     Route::middleware('role:reception,admin')->prefix('reception')->name('reception.')->group(function () {
@@ -90,6 +112,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('rooms/{room}/status', ReceptionRoomStatusController::class)->name('rooms.status.update');
 
         Route::get('pending', PendingController::class)->name('pending');
+
+        // Booking requests guests sent online.
+        Route::get('requests', [BookingRequestController::class, 'index'])->name('requests.index');
+        Route::patch('requests/{bookingRequest}/approve', [BookingRequestController::class, 'approve'])->name('requests.approve');
+        Route::patch('requests/{bookingRequest}/decline', [BookingRequestController::class, 'decline'])->name('requests.decline');
 
         Route::get('refunds', [RefundController::class, 'index'])->name('refunds.index');
         Route::patch('refunds/{refund}/advance', [RefundController::class, 'advance'])->name('refunds.advance');
@@ -141,6 +168,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('options', [OptionsController::class, 'edit'])->name('options.edit');
         Route::put('options', [OptionsController::class, 'update'])->name('options.update');
+        Route::put('options/site', [OptionsController::class, 'updateSite'])->name('options.site');
         Route::post('options/id-photos/delete', [OptionsController::class, 'deletePhotos'])->name('options.id-photos.delete');
         Route::post('options/backups', [OptionsController::class, 'backup'])->middleware('throttle:6,1')->name('options.backups.store');
         Route::get('options/backups/{backup}', [OptionsController::class, 'download'])->name('options.backups.show');

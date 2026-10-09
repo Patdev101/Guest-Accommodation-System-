@@ -82,6 +82,8 @@ type Props = {
     paymentMethods: string[];
     standardTimes: { check_in: string; check_out: string };
     walkIn: boolean;
+    /** A room to start with (from "Get room" on the dashboard). */
+    preselect: number | null;
     /** The reservation being changed; null for a new booking. */
     editing: {
         id: number;
@@ -187,8 +189,20 @@ export default function NewReservation({
     paymentMethods,
     standardTimes,
     walkIn,
+    preselect,
     editing,
 }: Props) {
+    // "Get room" on the dashboard: that room is already added when it is free.
+    const picked =
+        editing || preselect === null
+            ? undefined
+            : rooms.find(
+                  (room) =>
+                      room.id === preselect &&
+                      room.blocked_reason === null &&
+                      room.rates.length > 0,
+              );
+
     const form = useForm<BookingForm>({
         contact_name: editing?.contact_name ?? '',
         contact_number: editing?.contact_number ?? '',
@@ -198,7 +212,25 @@ export default function NewReservation({
         guest_type: editing?.guest_type ?? guestTypes[0]?.value ?? 'visitor',
         starts_at: window.starts_at,
         ends_at: window.ends_at,
-        rooms: editing?.rooms ?? [],
+        rooms:
+            editing?.rooms ??
+            (picked
+                ? [
+                      {
+                          room_id: picked.id,
+                          room_rate_id: picked.rates[0].id,
+                          pax: Math.min(picked.pax_capacity, window.pax),
+                          price: String(
+                              suggestPrice(
+                                  picked.rates[0].price,
+                                  picked.rates[0].unit,
+                                  window.starts_at,
+                                  window.ends_at,
+                              ).total,
+                          ),
+                      },
+                  ]
+                : []),
         payment_amount: '',
         payment_method: '',
         paid_by: 'guest',

@@ -145,6 +145,27 @@ class Reservation extends Model
         return $this->status === ReservationStatus::Active;
     }
 
+    /**
+     * A note for the guest about how the booking ended: who cancelled it,
+     * when and why. Null while the booking is fine.
+     */
+    public function noteForGuest(): ?string
+    {
+        if ($this->status === ReservationStatus::NoShow) {
+            return __('Marked as a no-show: nobody arrived for this booking.');
+        }
+
+        if ($this->status !== ReservationStatus::Cancelled) {
+            return null;
+        }
+
+        $who = $this->canceller?->isStaff() === false ? __('Cancelled by you') : __('Cancelled by the front desk');
+        $when = $this->cancelled_at ? ' '.__('on :date', ['date' => $this->cancelled_at->format('j M Y')]) : '';
+        $why = filled($this->cancellation_reason) ? ' '.__('Reason: :reason', ['reason' => $this->cancellation_reason]) : '';
+
+        return $who.$when.'.'.$why;
+    }
+
     /** Reception may mark a no-show once the grace period after the reserved time has passed (rule 17). */
     public function noShowAllowedFrom(): CarbonImmutable
     {

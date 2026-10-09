@@ -59,6 +59,8 @@ class SetPasswordController extends Controller
                 $user->forceFill([
                     'password' => $password,
                     'password_set_at' => now(),
+                    // Opening the emailed link proves the address is theirs.
+                    'email_verified_at' => $user->email_verified_at ?? now(),
                     'remember_token' => Str::random(60),
                 ])->save();
             },

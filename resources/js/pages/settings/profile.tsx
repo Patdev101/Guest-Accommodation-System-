@@ -13,7 +13,7 @@ type PageProps = {
     auth: Auth;
 };
 
-export default function Profile() {
+export default function Profile({ company }: { company?: string | null }) {
     const { auth } = usePage<PageProps>().props;
 
     return (
@@ -100,6 +100,31 @@ export default function Profile() {
                                     message={errors.contact_number}
                                 />
                             </div>
+
+                            {auth.user.role === 'guest' && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="company">Company</Label>
+
+                                    <Input
+                                        id="company"
+                                        className="mt-1 block w-full"
+                                        defaultValue={company ?? ''}
+                                        name="company"
+                                        autoComplete="organization"
+                                        placeholder="The company you book for"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Filled in for you on a booking request.
+                                        Change it here, or on the request
+                                        itself, if you move to another company.
+                                    </p>
+
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.company}
+                                    />
+                                </div>
+                            )}
 
                             <div className="flex items-center gap-4">
                                 <Button

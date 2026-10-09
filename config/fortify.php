@@ -145,6 +145,8 @@ return [
     'features' => [
         Features::registration(),
         Features::resetPasswords(),
+        // Guests confirm their email before they can send booking requests.
+        Features::emailVerification(),
     ],
 
 ];

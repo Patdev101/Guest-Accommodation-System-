@@ -22,6 +22,7 @@ class ProfileController extends Controller
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'company' => $request->user()->guest?->company,
         ]);
     }
 
@@ -30,13 +31,22 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $request->user()->fill($request->safe()->except('company'));
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
         }
 
         $request->user()->save();
+
+        // A guest's company lives on their guest profile, which bookings use.
+        if (! $request->user()->isStaff()) {
+            $request->user()->guest()->updateOrCreate([], [
+                'name' => $request->user()->name,
+                'contact_number' => (string) $request->user()->contact_number,
+                'company' => $request->validated('company'),
+            ]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 

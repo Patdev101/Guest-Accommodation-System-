@@ -695,7 +695,7 @@ function StayCard({ stay }: { stay: Stay }) {
                 </div>
                 <Button size="sm" asChild>
                     <Link href={staysShow(stay.stay_id)}>
-                        Open stay
+                        Open
                         <ArrowRight />
                     </Link>
                 </Button>

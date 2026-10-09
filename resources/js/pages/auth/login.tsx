@@ -62,19 +62,27 @@ export default function Login({ status, canResetPassword }: Props) {
                                     placeholder="Password"
                                 />
                                 <InputError message={errors.password} />
+                            </div>
+
+                            {/* One row: "Remember me" on the left, the forgot link on the right. */}
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox id="remember" name="remember" />
+                                    <Label
+                                        htmlFor="remember"
+                                        className="h-4 leading-4"
+                                    >
+                                        Remember me
+                                    </Label>
+                                </div>
                                 {canResetPassword && (
                                     <TextLink
                                         href={request()}
-                                        className="justify-self-end text-sm"
+                                        className="text-sm"
                                     >
                                         Forgot your password?
                                     </TextLink>
                                 )}
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <Checkbox id="remember" name="remember" />
-                                <Label htmlFor="remember">Remember me</Label>
                             </div>
 
                             <Button

@@ -36,7 +36,38 @@ class OptionsController extends Controller
             ],
             'backupsToKeep' => (int) Setting::get('backups_to_keep'),
             'backups' => $housekeeping->backups(),
+            'site' => [
+                'contact_phone' => (string) Setting::get('contact_phone'),
+                'contact_email' => (string) Setting::get('contact_email'),
+                'contact_address' => (string) Setting::get('contact_address'),
+                'booking_request_hold_hours' => (int) Setting::get('booking_request_hold_hours'),
+            ],
         ]);
+    }
+
+    /** What the guest website shows and how long a booking request holds its rooms. */
+    public function updateSite(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'contact_phone' => ['nullable', 'string', 'max:60'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
+            'contact_address' => ['nullable', 'string', 'max:255'],
+            'booking_request_hold_hours' => ['required', 'integer', 'min:1', 'max:168'],
+        ], [], [
+            'contact_phone' => 'phone',
+            'contact_email' => 'email',
+            'contact_address' => 'address',
+            'booking_request_hold_hours' => 'hours',
+        ]);
+
+        Setting::set('contact_phone', trim((string) ($validated['contact_phone'] ?? '')));
+        Setting::set('contact_email', trim((string) ($validated['contact_email'] ?? '')));
+        Setting::set('contact_address', trim((string) ($validated['contact_address'] ?? '')));
+        Setting::set('booking_request_hold_hours', (string) $validated['booking_request_hold_hours']);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Guest website details saved.')]);
+
+        return to_route('admin.options.edit');
     }
 
     public function update(Request $request): RedirectResponse

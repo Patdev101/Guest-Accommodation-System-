@@ -1,4 +1,4 @@
-import { Head, Link, router, usePoll } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
     CheckCircle2,
@@ -6,12 +6,13 @@ import {
     DoorOpen,
     ExternalLink,
     LogIn,
+    LogOut,
     Phone,
     Plus,
     Search,
     Settings2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import CheckInController from '@/actions/App/Http/Controllers/Reception/CheckInController';
 import RoomStatusController from '@/actions/App/Http/Controllers/Reception/RoomStatusController';
@@ -136,7 +137,6 @@ export default function FrontDesk({
     overdue,
     dueSoon,
     toInspect,
-    groups,
     board,
     rules,
 }: Props) {
@@ -147,11 +147,8 @@ export default function FrontDesk({
         target: Transition;
     } | null>(null);
     const [search, setSearch] = useState('');
-    const [location, setLocation] = useState<number | null>(null);
-    const [group, setGroup] = useState<RoomStatusGroup | null>(null);
-
-    // Keep the day's picture current without a manual refresh.
-    usePoll(60_000);
+    // The board's status filter, so the "Available now" tile can set it.
+    const [status, setStatus] = useState<string | null>(null);
 
     // Rooms where the next guest is due today but the last guest is still in.
     const clashes = board
@@ -160,23 +157,13 @@ export default function FrontDesk({
     const lateIds = new Set(overdue.map((row) => row.id));
     const expected = arrivals.filter((row) => !lateIds.has(row.id));
 
-    const shown = useMemo(
-        () =>
-            board
-                .filter((item) => location === null || item.id === location)
-                .map((item) => ({
-                    ...item,
-                    rooms: item.rooms.filter(
-                        (room) => group === null || room.group === group,
-                    ),
-                }))
-                .filter((item) => group === null || item.rooms.length > 0),
-        [board, location, group],
-    );
-
     const showAvailable = () => {
-        setLocation(null);
-        setGroup('available');
+        setStatus(
+            board
+                .flatMap((item) => item.rooms)
+                .find((room) => room.group === 'available')?.status_label ??
+                'Available',
+        );
         document
             .getElementById('rooms')
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -188,7 +175,7 @@ export default function FrontDesk({
             <Page>
                 <PageHeader
                     title={greeting()}
-                    description={`${formatToday()} · updates every minute`}
+                    description={`${formatToday()} · updates by itself`}
                     actions={
                         <>
                             <form
@@ -529,102 +516,60 @@ export default function FrontDesk({
                         id="rooms"
                         className="scroll-mt-4 gap-5 xl:col-start-1 xl:row-start-1"
                     >
-                        <CardHeader className="gap-4">
-                            <div className="space-y-1.5">
-                                <CardTitle>Rooms</CardTitle>
-                                <CardDescription>
-                                    Click a room to see its prices, inclusions
-                                    and who is in it, check a guest in or change
-                                    its status.
-                                </CardDescription>
-                            </div>
-                            {board.length > 1 && (
-                                <div
-                                    role="group"
-                                    aria-label="Location"
-                                    className="flex flex-wrap gap-2"
-                                >
-                                    <FilterChip
-                                        active={location === null}
-                                        onClick={() => setLocation(null)}
-                                    >
-                                        All locations
-                                    </FilterChip>
-                                    {board.map((item) => (
-                                        <FilterChip
-                                            key={item.id}
-                                            active={location === item.id}
-                                            onClick={() => setLocation(item.id)}
-                                        >
-                                            {item.name}
-                                        </FilterChip>
-                                    ))}
-                                </div>
-                            )}
-                            <div
-                                role="group"
-                                aria-label="Status"
-                                className="flex flex-wrap gap-2"
-                            >
-                                <FilterChip
-                                    active={group === null}
-                                    onClick={() => setGroup(null)}
-                                    tone="soft"
-                                >
-                                    All statuses
-                                </FilterChip>
-                                {groups.map((item) => (
-                                    <FilterChip
-                                        key={item.value}
-                                        active={group === item.value}
-                                        onClick={() =>
-                                            setGroup(
-                                                group === item.value
-                                                    ? null
-                                                    : item.value,
-                                            )
-                                        }
-                                        tone="soft"
-                                        title={item.description}
-                                    >
-                                        <StatusDot group={item.value} />
-                                        {item.label}
-                                        <span className="text-muted-foreground tabular-nums">
-                                            {item.count}
-                                        </span>
-                                    </FilterChip>
-                                ))}
-                            </div>
+                        <CardHeader>
+                            <CardTitle>Rooms</CardTitle>
+                            <CardDescription>
+                                One location at a time. Click a room to see its
+                                prices, inclusions and who is in it; "Get room"
+                                starts a check-in in that room.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {shown.length === 0 ? (
-                                <EmptyState
-                                    icon={Search}
-                                    title="No rooms match"
-                                    description="Try another status or location."
-                                    className="py-8"
-                                    action={
+                            <RoomBoard
+                                locations={board}
+                                linkRooms={false}
+                                status={status}
+                                onStatusChange={setStatus}
+                                onRoomClick={(room) => setPicking(room)}
+                                roomLabel={(room) =>
+                                    `${room.name}, ${room.status_label}${room.stay ? `, ${room.stay.guest}` : ''}. Open`
+                                }
+                                roomAction={(room) =>
+                                    room.stay ? (
                                         <Button
+                                            size="sm"
                                             variant="outline"
-                                            onClick={() => {
-                                                setGroup(null);
-                                                setLocation(null);
-                                            }}
+                                            asChild
                                         >
-                                            Show all rooms
+                                            <Link
+                                                href={staysShow(room.stay.id)}
+                                            >
+                                                <LogOut />
+                                                Check out
+                                            </Link>
                                         </Button>
-                                    }
-                                />
-                            ) : (
-                                <RoomBoard
-                                    locations={shown}
-                                    linkRooms={false}
-                                    onRoomClick={(room) => setPicking(room)}
-                                    roomLabel={(room) =>
-                                        `${room.name}, ${room.status_label}${room.stay ? `, ${room.stay.guest}` : ''}. Open`
-                                    }
-                                />
-                            )}
+                                    ) : room.arrival ? (
+                                        <CheckInButton
+                                            id={room.arrival.reservation_id}
+                                        />
+                                    ) : room.group === 'available' &&
+                                      // A room without a price cannot be booked yet.
+                                      room.rates.some(
+                                          (rate) => !rate.is_extension,
+                                      ) ? (
+                                        <Button size="sm" asChild>
+                                            <Link
+                                                href={walkIn({
+                                                    query: { room: room.id },
+                                                })}
+                                            >
+                                                <LogIn />
+                                                Get room
+                                            </Link>
+                                        </Button>
+                                    ) : null
+                                }
+                            />
                         </CardContent>
                     </Card>
                 </div>
@@ -686,7 +631,7 @@ function Marker({ className }: { className: string }) {
 function LiveBadge() {
     return (
         <span
-            title="Updates every minute"
+            title="Updates by itself every few seconds"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
         >
             <span className="relative flex size-2">
@@ -695,39 +640,6 @@ function LiveBadge() {
             </span>
             Live
         </span>
-    );
-}
-
-function FilterChip({
-    active,
-    onClick,
-    tone = 'solid',
-    title,
-    children,
-}: {
-    active: boolean;
-    onClick: () => void;
-    tone?: 'solid' | 'soft';
-    title?: string;
-    children: ReactNode;
-}) {
-    return (
-        <Button
-            type="button"
-            size="sm"
-            variant={active && tone === 'solid' ? 'default' : 'outline'}
-            aria-pressed={active}
-            title={title}
-            onClick={onClick}
-            className={cn(
-                'h-8 rounded-full px-3',
-                active &&
-                    tone === 'soft' &&
-                    'border-primary bg-accent text-accent-foreground hover:bg-accent',
-            )}
-        >
-            {children}
-        </Button>
     );
 }
 
@@ -904,7 +816,7 @@ function RoomDialog({
                                     <Button size="sm" variant="outline" asChild>
                                         <Link href={staysShow(room.stay.id)}>
                                             <ExternalLink />
-                                            Open stay
+                                            Open
                                         </Link>
                                     </Button>
                                 }
